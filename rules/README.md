@@ -62,7 +62,7 @@ And ways to turn a score into pairs. Each uses `v.ok` unless you pass
 | Helper | What it does |
 | --- | --- |
 | `v.pair_best(s)` | Gives each person, in turn, their best-scored candidate who is still free. |
-| `v.pair_mutual(s, top=10)` | Pairs people who are each in the other's top `top`, most promising first. The article's method. |
+| `v.pair_mutual(s, top=10)` | Pairs people who are each in the other's top `top`, most promising first. An approximation of the article's method. |
 | `v.pair_stable(s)` | A stable matching on the scores (deferred acceptance). |
 | `v.rank(s)` | Each person's ranking of their candidates, if you want to build your own. |
 

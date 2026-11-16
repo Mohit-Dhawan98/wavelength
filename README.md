@@ -1,17 +1,25 @@
-# Wavelength
+# Dating environment (companion to the article ["Why The Girl You Want Doesn't Want You Back"](https://themlnerd.substack.com/p/why-the-girl-you-want-doesnt-want))
 
-Most matching systems look for the best match for each user. This one looks
-for the match where two people are each other's best, because a match only
-counts when both say yes.
+A dating environment for testing matching rules. It makes a world of
+simulated daters, lets a matching rule introduce them to each other for
+several weeks, and grades the rule against an answer key the rule cannot
+see.
 
-This repository is a small reference implementation of the ideas in
+> **This is an approximation.** The environment approximates the method
+> described in the article. The original source code was delivered to the
+> client and is not available here, so nothing in this repository is that
+> implementation, and its results say nothing about the production system.
+
+Most matching systems look for the best match for each user. The article,
 [Why The Girl You Want Doesn't Want You Back: how we 3x'd match acceptance by
 switching from "best match" to "mutual match"](https://themlnerd.substack.com/p/why-the-girl-you-want-doesnt-want)
-by Mohit Dhawan (2026-02-01).
+by Mohit Dhawan (2026-02-01), looks for the match where two people are each
+other's best, because a match only counts when both say yes. The Python
+package here is named `wavelength`.
 
-**Play it in your browser:** https://mohit-dhawan98.github.io/wavelength/ — design a world, write a
-matching rule in a few lines, and see how many couples it finds out of the most that were possible.
-The page runs this package in your browser; nothing is sent to a server.
+**Try it in your browser:** https://mohit-dhawan98.github.io/dating-env/ lets you choose a world,
+design a matching rule in a few lines, and see how many couples it finds out of the most that were
+possible. The page runs this package in your browser. Nothing is sent to a server.
 
 ## What this is and is not
 
