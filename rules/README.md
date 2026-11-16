@@ -14,6 +14,7 @@ see.
    ```python
    from wavelength.play import rule
 
+
    @rule("vibes first")
    def vibes_first(v):
        s = 0.5 * v.text + 0.3 * v.voice + 0.2 * v.features()

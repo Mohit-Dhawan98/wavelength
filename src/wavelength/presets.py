@@ -329,6 +329,7 @@ DYSTOPIA = Preset(
         "extraction_accuracy": 0.75,
         "text_signal_quality": 0.30,
         "photo_signal_quality": 0.30,
+        "voice_signal_quality": 0.30,
     },
     reasons={
         "majority_share": "Three seeking for every one sought. Assumption.",
@@ -361,6 +362,7 @@ DYSTOPIA = Preset(
         "extraction_accuracy": "Sparse text is misread more often. Assumption.",
         "text_signal_quality": "One-line bios say little. Assumption.",
         "photo_signal_quality": "Few, heavily curated photos say little. Assumption.",
+        "voice_signal_quality": "Hurried, guarded conversations give little away. Assumption.",
     },
 )
 

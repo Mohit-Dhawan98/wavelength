@@ -1,6 +1,6 @@
 # How matching should work
 
-Ten principles behind this implementation. The substance comes from
+Eleven principles behind this implementation. The substance comes from
 [the article](https://themlnerd.substack.com/p/why-the-girl-you-want-doesnt-want);
 each principle points at the function that embodies it.
 
@@ -144,3 +144,31 @@ Code: the `curve` argument of `matching.mutual_top_n`,
 `matching.assign_by_probability` and `matching.bidirectional_match`;
 `calibration.fit_rank_curve`; and `simulate.run_simulation(calibrate=True)`,
 which fits on one set of pools and reports on another.
+
+## 11. Grade a matcher against an answer key it did not write
+
+"We assumed 30% of matches work out" is not a test of anything: whatever
+the matcher does, 30% work out. A matcher can only be graded against
+outcomes that were settled without it. So the world decides first, from
+what its people are really like, how far every possible pair would get:
+whether both would say yes, whether they would keep talking, whether they
+would meet, whether both would want to meet again. Each step depends on
+named things about the two people, and all the luck is drawn once, in
+advance. Rates in the settings say how many pairs pass each step; they do
+not say which.
+
+Then the score has a meaning. From the key, work out the most couples
+anyone could have formed, and report a matcher's couples as a share of
+that. Beside it, report what a reader of perfect profiles could have
+reached without seeing chemistry or luck, so that "the rule is weak" and
+"the information is not there" can be told apart. Give every matcher the
+same people and the same luck, so they differ only in what they chose. And
+never let the matcher see the key: hand it a copy of what the app observed
+and nothing else, and test that.
+
+This is still a simulation. The key is true of the simulated world and of
+nothing else. What it buys is that within that world the grading is honest.
+
+Code: `key.build_key`, the stages; `best.most_couples`, the ceiling;
+`engine.Arena`, which keeps truth and view apart; `view.View`, all a rule
+gets; and `play.scorecard`.
