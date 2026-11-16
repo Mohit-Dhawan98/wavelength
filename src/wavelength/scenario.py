@@ -43,7 +43,7 @@ CORE_FEATURES: tuple[str, ...] = tuple(
 )
 
 #: What observable attraction is made of; see ``Scenario.attraction_mix``.
-ATTRACTION_PARTS: tuple[str, ...] = ("values", "vibe", "lifestyle")
+ATTRACTION_PARTS: tuple[str, ...] = ("values", "vibe", "lifestyle", "manner")
 
 _TOLERANCE = 1e-6
 
@@ -120,9 +120,30 @@ class Archetype:
         return getattr(self, feature)
 
 
-def _knob(default: Any, *, group: str, meaning: str, sensible: str, basis: str) -> Any:
-    """A scenario field with its real-world documentation attached."""
-    metadata = {"group": group, "meaning": meaning, "sensible": sensible, "basis": basis}
+def _knob(
+    default: Any,
+    *,
+    group: str,
+    meaning: str,
+    sensible: str,
+    basis: str,
+    low: float = 0.0,
+    high: float = 1.0,
+) -> Any:
+    """A scenario field with its real-world documentation attached.
+
+    ``low`` and ``high`` are the hard limits for a number: construction
+    rejects anything outside them, and a user interface can build a slider
+    from them. ``sensible`` is the narrower range worth trying, in words.
+    """
+    metadata = {
+        "group": group,
+        "meaning": meaning,
+        "sensible": sensible,
+        "basis": basis,
+        "low": low,
+        "high": high,
+    }
     if isinstance(default, (dict, tuple)):
         return field(default_factory=lambda: default, metadata=metadata)
     return field(default=default, metadata=metadata)
@@ -132,6 +153,9 @@ _MARKET = "The market"
 _WANTS = "What people want"
 _CHOICE = "How people choose"
 _KNOWN = "What the app knows"
+_CULTURE = "Culture"
+_ATTENTION = "Attention over time"
+_LATER = "After the yes"
 
 _DEFAULT_ARCHETYPES: tuple[Archetype, ...] = (
     Archetype(
@@ -221,7 +245,14 @@ _DEFAULT_DEALBREAKER_SHARES: dict[str, float] = {
     "emotional_availability": 0.30,
 }
 
-_DEFAULT_ATTRACTION_MIX: dict[str, float] = {"values": 0.50, "vibe": 0.30, "lifestyle": 0.20}
+_DEFAULT_ATTRACTION_MIX: dict[str, float] = {
+    "values": 0.40,
+    "vibe": 0.25,
+    "lifestyle": 0.15,
+    "manner": 0.20,
+}
+
+_DEFAULT_COMMUNITY_SHARES: dict[str, float] = {"first": 0.60, "second": 0.30, "third": 0.10}
 
 
 @dataclass(frozen=True)
@@ -239,6 +270,8 @@ class Scenario:
 
     pool_size: int = _knob(
         1200,
+        low=20,
+        high=20000,
         group=_MARKET,
         meaning=(
             "People in one matching pool: everyone who could in principle be "
@@ -258,6 +291,8 @@ class Scenario:
     )
     majority_share: float = _knob(
         0.60,
+        low=0.5,
+        high=0.95,
         group=_MARKET,
         meaning=(
             "The pool has two sides and people are only introduced across them. "
@@ -270,19 +305,6 @@ class Scenario:
             "than women; no specific figure is taken from a source."
         ),
     )
-    active_share: float = _knob(
-        0.70,
-        group=_MARKET,
-        meaning=(
-            "Share of people who answer an introduction before it expires. The "
-            "rest still have profiles and can be proposed, but whatever they are "
-            "sent lapses unanswered. An expiry is not a no: the report counts it "
-            "separately. The matcher cannot tell who will answer."
-        ),
-        sensible="0.30 (mostly abandoned profiles) to 0.95 (a paid, high-intent service).",
-        basis="assumption.",
-    )
-
     # --- What people want -------------------------------------------------
 
     archetypes: tuple[Archetype, ...] = _knob(
@@ -356,6 +378,8 @@ class Scenario:
 
     yes_rate: float = _knob(
         0.30,
+        low=0.01,
+        high=0.95,
         group=_CHOICE,
         meaning=(
             "Share of eligible, randomly chosen people on the other side that a "
@@ -379,6 +403,7 @@ class Scenario:
     )
     yes_rate_spread: float = _knob(
         0.50,
+        high=2.0,
         group=_CHOICE,
         meaning=(
             "How much people differ in their own yes-rate. 0 means everyone has "
@@ -391,6 +416,8 @@ class Scenario:
     )
     minority_yes_ratio: float = _knob(
         0.70,
+        low=0.01,
+        high=2.0,
         group=_CHOICE,
         meaning=(
             "How often people on the scarce side say yes, relative to people on "
@@ -468,14 +495,255 @@ class Scenario:
         meaning=(
             "What the explainable part of personal fit is made of: 'values' "
             "(agreement on the structured features, weighted by what the person "
-            "cares about), 'vibe' (how alike two people sound) and 'lifestyle' "
-            "(how alike their daily lives are). Approximate shares of variance."
+            "cares about), 'vibe' (what two people say and how alike it is), "
+            "'lifestyle' (how alike their daily lives are) and 'manner' (how "
+            "they talk: pace, warmth, humour). Approximate shares of variance. "
+            "Each part is a separate hidden trait, so no one signal carries "
+            "the others."
         ),
-        sensible="Any three shares summing to 1.",
+        sensible="Any four shares summing to 1.",
         basis=(
-            "assumption. Deliberately not the matcher's 0.60 / 0.25 / 0.15 mix, "
-            "which the article fitted on its own production data."
+            "assumption. Deliberately not the article's 0.60 / 0.25 / 0.15 "
+            "scoring mix, which was fitted on its own production data."
         ),
+    )
+    preference_diversity: float = _knob(
+        0.70,
+        group=_CHOICE,
+        meaning=(
+            "How much people differ in what matters to them. At 0 everyone "
+            "weighs the features alike, so one set of weights describes "
+            "everybody. At 1 each person's attention is concentrated on their "
+            "own few features, so one person's dealbreaker is another's shrug "
+            "and a single global weighting misreads most people. It governs "
+            "graded preference; who refuses outright is set by the dealbreaker "
+            "shares."
+        ),
+        sensible="0.0 to 1.0.",
+        basis=(
+            "assumption. Set high because the article reports that the same "
+            "feature was decisive for some users and irrelevant to others, "
+            "across most of its features; it gives no measure."
+        ),
+    )
+
+    # --- After the yes ----------------------------------------------------
+
+    conversation_rate: float = _knob(
+        0.50,
+        low=0.01,
+        group=_LATER,
+        meaning=(
+            "Of eligible, randomly chosen pairs, the share whose conversation "
+            "would keep going if both said yes. Which pairs these are is not "
+            "random: it follows from how alike they sound, how well their ways "
+            "of talking fit, and whether either will make the first move."
+        ),
+        sensible="0.2 to 0.9.",
+        basis="assumption.",
+    )
+    date_rate: float = _knob(
+        0.40,
+        low=0.01,
+        group=_LATER,
+        meaning=(
+            "Of eligible, randomly chosen pairs, the share who would go on to "
+            "meet if their conversation kept going. Which pairs follows from shared "
+            "chemistry, how alike their lives are, and whether they live close "
+            "enough."
+        ),
+        sensible="0.2 to 0.9.",
+        basis="assumption.",
+    )
+    second_date_rate: float = _knob(
+        0.40,
+        low=0.01,
+        group=_LATER,
+        meaning=(
+            "Of eligible, randomly chosen pairs, the share in which both would "
+            "want to meet again if they met, before counting dealbreakers that "
+            "only surface in person and family approval. Which pairs follows "
+            "from what each feels for the other, chemistry included."
+        ),
+        sensible="0.1 to 0.8.",
+        basis="assumption.",
+    )
+    leave_after_stage: int = _knob(
+        4,
+        low=1,
+        high=4,
+        group=_LATER,
+        meaning=(
+            "How far a couple must get before both stop taking introductions: "
+            "1 both said yes, 2 the conversation keeps going, 3 they met, 4 "
+            "both want to meet again."
+        ),
+        sensible="3 or 4. Lower values take people out of the pool on thin evidence.",
+        basis="assumption.",
+    )
+
+    # --- Attention over time ----------------------------------------------
+
+    open_rate: float = _knob(
+        0.70,
+        low=0.05,
+        group=_ATTENTION,
+        meaning=(
+            "How often a typical person opens the app in a given week, and so "
+            "answers what they were sent before it expires. An introduction "
+            "that expires is not a no."
+        ),
+        sensible="0.3 (most weeks pass unopened) to 0.95 (a paid, high-intent service).",
+        basis="assumption.",
+    )
+    open_rate_spread: float = _knob(
+        0.30,
+        group=_ATTENTION,
+        meaning=(
+            "How much people differ in that habit. At 0 everyone opens the app "
+            "equally often. At 1 the pool splits into people who always answer "
+            "and people who never do."
+        ),
+        sensible="0.0 to 1.0.",
+        basis="assumption.",
+    )
+    fatigue: float = _knob(
+        0.15,
+        group=_ATTENTION,
+        meaning=(
+            "Share of a person's willingness to open the app that is lost with "
+            "each letdown: an introduction they turned down, or one where they "
+            "said yes and the other person did not. A matcher that wastes "
+            "people's attention makes them harder to reach later."
+        ),
+        sensible="0.0 (people never tire) to 0.4.",
+        basis="assumption.",
+    )
+    patience: float = _knob(
+        6.0,
+        low=1.0,
+        high=50.0,
+        group=_ATTENTION,
+        meaning=(
+            "How many letdowns a typical person takes before giving up on the "
+            "app altogether. People differ around this number."
+        ),
+        sensible="2 to 15.",
+        basis="assumption.",
+    )
+
+    # --- Culture ----------------------------------------------------------
+
+    community_shares: Mapping[str, float] = _knob(
+        _DEFAULT_COMMUNITY_SHARES,
+        group=_CULTURE,
+        meaning=(
+            "Shares of the pool belonging to each community. A community stands "
+            "for whatever people in this world marry within when they marry "
+            "within anything: religion, language, caste, region. The names are "
+            "placeholders."
+        ),
+        sensible="Any number of communities with shares summing to 1.",
+        basis="assumption. Three placeholder communities; no real population is meant.",
+    )
+    endogamy_share: float = _knob(
+        0.15,
+        group=_CULTURE,
+        meaning=(
+            "Share of people for whom a partner from their own community is a "
+            "dealbreaker. They say no to anyone outside it."
+        ),
+        sensible="0.0 to 0.9.",
+        basis="assumption. Not taken from any survey.",
+    )
+    family_approval_share: float = _knob(
+        0.10,
+        group=_CULTURE,
+        meaning=(
+            "Share of people who need their family's approval before a "
+            "relationship can continue. Their family judges a partner by how "
+            "well the two families' expectations fit, and can end a match that "
+            "the two people themselves were happy with."
+        ),
+        sensible="0.0 to 0.9.",
+        basis="assumption. Not taken from any survey.",
+    )
+    family_visibility: float = _knob(
+        0.30,
+        group=_CULTURE,
+        meaning=(
+            "How well the app can see family expectations. 1.0 is a product "
+            "that asks about family in detail; 0.0 is one that never asks."
+        ),
+        sensible="0.0 to 0.9.",
+        basis="assumption.",
+    )
+    marriage_pressure: float = _knob(
+        0.20,
+        group=_CULTURE,
+        meaning=(
+            "How strongly age pushes people towards wanting marriage. At 0 what "
+            "people want does not depend on age. At 1 nearly everyone in their "
+            "mid-thirties has moved a step towards marriage from where their "
+            "own inclination would put them."
+        ),
+        sensible="0.0 to 1.0.",
+        basis="assumption. Not taken from any survey.",
+    )
+    intent_openness: float = _knob(
+        0.85,
+        group=_CULTURE,
+        meaning=(
+            "Share of people who state what they are looking for, and what they "
+            "will not accept, as it really is. The rest give the answer most "
+            "people give and keep a community requirement to themselves, so "
+            "the mismatch only surfaces in person. This is the one place where "
+            "what the app knows about a dealbreaker can be wrong."
+        ),
+        sensible="0.5 to 1.0.",
+        basis="assumption.",
+    )
+    larger_side_initiates: float = _knob(
+        0.80,
+        group=_CULTURE,
+        meaning=(
+            "Share of people on the larger side who will make the first move "
+            "once both have said yes. If neither person in a pair will, the "
+            "conversation never starts."
+        ),
+        sensible="0.3 to 1.0.",
+        basis="assumption.",
+    )
+    scarce_side_initiates: float = _knob(
+        0.50,
+        group=_CULTURE,
+        meaning="The same for people on the scarce side.",
+        sensible="0.05 to 1.0.",
+        basis="assumption.",
+    )
+    distance_tolerance: float = _knob(
+        0.50,
+        low=0.05,
+        high=2.0,
+        group=_CULTURE,
+        meaning=(
+            "How far a typical person will travel to meet, as a share of the "
+            "width of the area the pool covers. Two people meet only if the "
+            "distance between them is within what they will travel between "
+            "them. People differ around this number."
+        ),
+        sensible="0.1 (a neighbourhood) to 1.5 (anywhere in the area).",
+        basis="assumption.",
+    )
+    photos_hidden_share: float = _knob(
+        0.05,
+        group=_CULTURE,
+        meaning=(
+            "Share of people who keep their photos hidden until later. For "
+            "them the app has no photo signal at all."
+        ),
+        sensible="0.0 to 0.9.",
+        basis="assumption.",
     )
 
     # --- What the app knows -----------------------------------------------
@@ -505,9 +773,9 @@ class Scenario:
         0.40,
         group=_KNOWN,
         meaning=(
-            "Share of features whose importance has been revealed by a person's "
-            "reasons for accepting or rejecting past introductions. Grows with "
-            "time on the app."
+            "Share of features whose importance a person reveals each time they "
+            "explain a yes or a no. People arrive with one such explanation "
+            "behind them and add another with every introduction they answer."
         ),
         sensible="0.0 (everyone is new) to 0.8.",
         basis="assumption.",
@@ -523,8 +791,9 @@ class Scenario:
         0.15,
         group=_KNOWN,
         meaning=(
-            "Share of features whose importance has been revealed by reflection "
-            "after a real date. Small, because dates are rarer than introductions."
+            "Share of features whose importance a person reveals each time they "
+            "talk through a real date. People arrive with one such talk behind "
+            "them and add another each time they meet someone."
         ),
         sensible="0.0 to 0.5.",
         basis="assumption.",
@@ -607,6 +876,17 @@ class Scenario:
             "number is taken from that study."
         ),
     )
+    voice_signal_quality: float = _knob(
+        0.50,
+        group=_KNOWN,
+        meaning=(
+            "How well the voice signal reflects how a person really talks: "
+            "pace, warmth, humour, the things a transcript loses. 1.0 is a "
+            "perfect read; 0.0 is noise, or a product with no voice at all."
+        ),
+        sensible="0.0 (no voice in the product) to 0.9.",
+        basis="assumption.",
+    )
     intent_visible_in_bio: float = _knob(
         0.20,
         group=_KNOWN,
@@ -625,20 +905,18 @@ class Scenario:
     def __post_init__(self) -> None:
         if isinstance(self.pool_size, bool) or not isinstance(self.pool_size, int):
             raise ValueError(f"pool_size must be a whole number, got {self.pool_size!r}")
-        if self.pool_size < 20:
-            raise ValueError(f"pool_size must be at least 20, got {self.pool_size}")
+        if not 20 <= self.pool_size <= 20000:
+            raise ValueError(f"pool_size must be between 20 and 20000, got {self.pool_size}")
         self._check_archetypes()
         self._check_mappings()
-        bounds: dict[str, tuple[float, float]] = {
-            "majority_share": (0.5, 0.95),
-            "yes_rate": (0.01, 0.95),
-            "yes_rate_spread": (0.0, 2.0),
-            "minority_yes_ratio": (0.01, 2.0),
-        }
         for f in fields(self):
             if f.type == "float":
-                low, high = bounds.get(f.name, (0.0, 1.0))
-                object.__setattr__(self, f.name, _share(f.name, getattr(self, f.name), low, high))
+                value = _share(f.name, getattr(self, f.name), f.metadata["low"], f.metadata["high"])
+                object.__setattr__(self, f.name, value)
+        if isinstance(self.leave_after_stage, bool) or self.leave_after_stage not in (1, 2, 3, 4):
+            raise ValueError(
+                f"leave_after_stage must be 1, 2, 3 or 4, got {self.leave_after_stage!r}"
+            )
         if self.full_profile_share > self.feature_coverage:
             raise ValueError("full_profile_share cannot exceed feature_coverage")
         if self.dealbreakers_known_share < self.full_profile_share:
@@ -681,6 +959,13 @@ class Scenario:
             raise ValueError(f"attraction_mix needs exactly these parts: {list(ATTRACTION_PARTS)}")
         mix = _distribution("attraction_mix", self.attraction_mix, ATTRACTION_PARTS)
         object.__setattr__(self, "attraction_mix", mix)
+
+        if not self.community_shares:
+            raise ValueError("community_shares needs at least one community")
+        communities = _distribution(
+            "community_shares", self.community_shares, tuple(self.community_shares)
+        )
+        object.__setattr__(self, "community_shares", communities)
 
     def archetype(self, name: str) -> Archetype:
         """The archetype with this name."""

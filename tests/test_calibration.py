@@ -153,7 +153,7 @@ def test_fitting_pools_are_not_the_pools_the_curve_is_checked_on():
 
 
 def test_only_decisions_of_people_who_answered_are_fitted_on():
-    scenario = dataclasses.replace(Scenario(), pool_size=300, active_share=0.5)
+    scenario = dataclasses.replace(Scenario(), pool_size=300, open_rate=0.5)
     outcomes = observe_rank_outcomes(scenario, seed=0, trials=1)
     world = generate_world(trial_seeds(0, 0, fitting=True)[0], scenario)
     proposals = bidirectional(world.observations, np.arange(300), TOP_N)
@@ -215,7 +215,7 @@ def test_rank_correlation_is_one_for_identical_rankings_and_minus_one_for_revers
 def test_world_check_reports_what_the_scenario_implies():
     scenario = dataclasses.replace(Scenario(), pool_size=600)
     check = check_world(generate_world(0, scenario))
-    assert check.responding_share == pytest.approx(scenario.active_share, abs=0.06)
+    assert check.responding_share == pytest.approx(scenario.open_rate, abs=0.06)
     assert 0.15 < check.yes_rate_realised < scenario.yes_rate
     assert check.candidates_majority > 0 and check.candidates_minority > 0
     # A perfect read of profiles tracks feeling better than any noisy score can,

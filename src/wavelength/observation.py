@@ -5,20 +5,28 @@ mistakes, text and photo signals of limited quality, and importance weights
 resolved from onboarding, match-feedback and post-date signals by the same
 ``WeightProfile`` a real system would use.
 
-One simplification is deliberate. The four hard-filter values are either
-known correctly or not known at all; they are never known wrongly. People
-do misstate dealbreakers, and a world where they do would produce filter
-violations no matcher could see. Leaving that out keeps the filter check in
-the report meaningful: a violation there is always the strategy's doing.
+The app records what people state. The four hard-filter answers are either
+recorded as stated or not known at all; extraction never garbles them. What
+people state is their true answer except where ``intent_openness`` says
+otherwise: someone who is not open about what they want gives the usual
+answer, and keeps a community requirement to themselves. So a rule can obey
+every dealbreaker the app knows about and still introduce two people who
+turn out, in person, to want different things. The scorecard counts
+violations of *known* dealbreakers, which are always the rule's doing.
+
+Four channels carry four different hidden traits: structured features,
+text (what people say), photos (how they live) and voice (how they talk).
+Each has its own quality setting, and none stands in for another.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 
 import numpy as np
 
 from wavelength.features import FEATURE_NAMES, FEATURES, MISSING
+from wavelength.filters import eligibility_matrix
 from wavelength.population import TIERS, Population, unit_rows
 from wavelength.scenario import DEALBREAKER_FEATURES, Scenario
 from wavelength.weights import TIER_BANDS, Source, WeightProfile, WeightSignal
@@ -35,11 +43,45 @@ _WEEKS: dict[Source, tuple[int, int]] = {
 class Observations:
     """Everything a matcher is allowed to see."""
 
-    across: np.ndarray  # (n, n) bool: opposite sides; the app knows who is seeking whom
-    codes: np.ndarray  # (n, F) int, MISSING where a feature was not extracted
+    majority: np.ndarray  # (n,) bool: on the larger side; the app knows who is seeking whom
+    codes: np.ndarray  # (n, F) int, as stated; MISSING where a feature was not extracted
     text_embeddings: np.ndarray  # (n, VIBE_DIM)
-    visual_embeddings: np.ndarray  # (n, LIFESTYLE_DIM)
+    visual_embeddings: np.ndarray  # (n, LIFESTYLE_DIM); noise for people whose photos are hidden
+    voice_embeddings: np.ndarray  # (n, MANNER_DIM)
+    family_embeddings: np.ndarray  # (n, FAMILY_DIM): what the app has gathered about family
+    photos_hidden: np.ndarray  # (n,) bool: no photo signal for this person
+    community: np.ndarray  # (n,) which community each person belongs to
+    community_required: np.ndarray  # (n,) bool: has told the app they will not go outside it
+    age: np.ndarray  # (n,) years
+    location: np.ndarray  # (n, 2) where each person lives, in a unit square
     weight_profiles: tuple[WeightProfile, ...] = field(repr=False)
+
+    def copy(self) -> "Observations":
+        """A deep copy: new arrays and new weight profiles, sharing nothing with this one."""
+        arrays = {
+            f.name: getattr(self, f.name).copy()
+            for f in fields(self)
+            if f.name != "weight_profiles"
+        }
+        return Observations(**arrays, weight_profiles=tuple(p.copy() for p in self.weight_profiles))
+
+    @property
+    def across(self) -> np.ndarray:
+        """``[a, b]`` is True when a and b are on opposite sides."""
+        return self.majority[:, None] != self.majority[None, :]
+
+    @property
+    def known_ok(self) -> np.ndarray:
+        """Pairs on opposite sides that break no dealbreaker the app knows about.
+
+        The four hard filters on recorded values (failing closed on a gap),
+        and a stated requirement to stay within one's community.
+        """
+        other_community = self.community[:, None] != self.community[None, :]
+        barred = (
+            self.community_required[:, None] | self.community_required[None, :]
+        ) & other_community
+        return eligibility_matrix(self.codes) & self.across & ~barred
 
     @property
     def weights(self) -> np.ndarray:
@@ -55,11 +97,11 @@ def _share_among_incomplete(overall: float, complete: float) -> float:
 
 
 def _observe_features(
-    rng: np.random.Generator, scenario: Scenario, codes: np.ndarray
+    rng: np.random.Generator, scenario: Scenario, codes: np.ndarray, stated: np.ndarray
 ) -> np.ndarray:
     n = codes.shape[0]
     full = rng.random(n) < scenario.full_profile_share
-    observed = codes.copy()
+    observed = stated.copy()
 
     trait_rate = _share_among_incomplete(scenario.feature_coverage, scenario.full_profile_share)
     for j, name in enumerate(FEATURE_NAMES):
@@ -129,13 +171,25 @@ def _observe_vectors(rng: np.random.Generator, truth: np.ndarray, quality: float
 
 
 def observe(rng: np.random.Generator, scenario: Scenario, population: Population) -> Observations:
-    """Derive the matcher's view of a population."""
+    """Derive the matcher's view of a population.
+
+    The weights reflect onboarding plus one earlier round of match and
+    post-date feedback: people arrive with a little history. The engine
+    adds more as introductions are answered.
+    """
+    photos = _observe_vectors(rng, population.lifestyle, scenario.photo_signal_quality)
+    no_photos = _observe_vectors(rng, population.lifestyle, 0.0)
     return Observations(
-        across=population.across,
-        codes=_observe_features(rng, scenario, population.codes),
+        majority=population.majority.copy(),
+        codes=_observe_features(rng, scenario, population.codes, population.stated_codes),
         text_embeddings=_observe_vectors(rng, population.vibe, scenario.text_signal_quality),
-        visual_embeddings=_observe_vectors(
-            rng, population.lifestyle, scenario.photo_signal_quality
-        ),
+        visual_embeddings=np.where(population.photos_hidden[:, None], no_photos, photos),
+        voice_embeddings=_observe_vectors(rng, population.manner, scenario.voice_signal_quality),
+        family_embeddings=_observe_vectors(rng, population.family, scenario.family_visibility),
+        photos_hidden=population.photos_hidden.copy(),
+        community=population.community.copy(),
+        community_required=population.endogamous & population.open_about_intent,
+        age=population.age.copy(),
+        location=population.location.copy(),
         weight_profiles=_observe_weights(rng, scenario, population.tiers),
     )

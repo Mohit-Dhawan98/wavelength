@@ -120,6 +120,12 @@ class WeightProfile:
         self._defaults = defaults
         self._history: dict[str, list[WeightSignal]] = {}
 
+    def copy(self) -> "WeightProfile":
+        """An independent profile with the same history (signals are immutable, so shared)."""
+        twin = WeightProfile(self._defaults)
+        twin._history = {feature: list(signals) for feature, signals in self._history.items()}
+        return twin
+
     def record(self, signal: WeightSignal) -> None:
         """Add a signal. Nothing is overwritten; resolution happens on read."""
         self._history.setdefault(signal.feature, []).append(signal)

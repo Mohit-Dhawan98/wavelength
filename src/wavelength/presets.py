@@ -123,7 +123,7 @@ CASUAL = Preset(
             "emotional_availability": 0.15,
         },
         "yes_rate": 0.40,
-        "attraction_mix": {"values": 0.30, "vibe": 0.40, "lifestyle": 0.30},
+        "attraction_mix": {"values": 0.25, "vibe": 0.30, "lifestyle": 0.20, "manner": 0.25},
         "desirability_consensus": 0.40,
     },
     reasons={
@@ -173,13 +173,18 @@ SERIOUS = Preset(
         },
         "yes_rate": 0.20,
         "majority_share": 0.55,
-        "active_share": 0.85,
+        "open_rate": 0.85,
+        "family_approval_share": 0.40,
+        "family_visibility": 0.70,
+        "endogamy_share": 0.40,
+        "marriage_pressure": 0.50,
+        "intent_openness": 0.95,
         "self_knowledge": 0.65,
         "onboarding_reach": 0.90,
         "dealbreakers_known_share": 0.98,
         "full_profile_share": 0.50,
         "feature_coverage": 0.90,
-        "attraction_mix": {"values": 0.65, "vibe": 0.20, "lifestyle": 0.15},
+        "attraction_mix": {"values": 0.60, "vibe": 0.15, "lifestyle": 0.10, "manner": 0.15},
     },
     reasons={
         "archetypes": (
@@ -193,7 +198,18 @@ SERIOUS = Preset(
             "stakes are higher. Assumption."
         ),
         "majority_share": "Closer to balanced than a mainstream app. Assumption.",
-        "active_share": "People who sign up to find a spouse mostly answer. Assumption.",
+        "open_rate": "People who sign up to find a spouse mostly answer. Assumption.",
+        "family_approval_share": (
+            "Four in ten need their family's approval: marriage here is partly "
+            "a family matter. Assumption; not a figure for any real population."
+        ),
+        "family_visibility": "The service asks about family in detail. Assumption.",
+        "endogamy_share": (
+            "Four in ten will only marry within their community. Assumption; "
+            "not a figure for any real population."
+        ),
+        "marriage_pressure": "Age pushes people towards marriage more than today. Assumption.",
+        "intent_openness": "People come to say what they want. Assumption.",
         "self_knowledge": (
             "Somewhat better than today: people have thought about what they "
             "need, though still imperfectly. Assumption."
@@ -226,7 +242,11 @@ SWIPE = Preset(
         "yes_rate": 0.10,
         "decision_noise": 0.25,
         "desirability_consensus": 0.45,
-        "active_share": 0.60,
+        "open_rate": 0.60,
+        "fatigue": 0.20,
+        "intent_openness": 0.70,
+        "voice_signal_quality": 0.0,
+        "family_visibility": 0.0,
         "feature_coverage": 0.30,
         "full_profile_share": 0.05,
         "dealbreakers_known_share": 0.70,
@@ -246,7 +266,13 @@ SWIPE = Preset(
         "desirability_consensus": (
             "Photo-first judgement leans more on general appeal than on fit. Assumption."
         ),
-        "active_share": "Four in ten accounts in a feed are idle. Assumption.",
+        "open_rate": "A typical person opens the app six weeks in ten. Assumption.",
+        "fatigue": "A feed of misses wears people down faster. Assumption.",
+        "intent_openness": (
+            "A profile field invites the safe answer more than a conversation does. Assumption."
+        ),
+        "voice_signal_quality": "A swipe feed has no voice.",
+        "family_visibility": "A swipe feed does not ask about family.",
         "feature_coverage": (
             "Source for the figure: the article's survey completion rate, the "
             "nearest thing it reports to a form-based profile."
@@ -274,8 +300,9 @@ DYSTOPIA = Preset(
         "attracts people is the same for everyone, so attention piles onto a "
         "few. People on the crowded side are as willing as today's, but the "
         "scarce side accepts far less often and yes-rates vary wildly, with "
-        "some people accepting almost nobody. Nearly half the profiles never "
-        "answer, most are nearly empty, what people say they "
+        "some people accepting almost nobody. People open the app barely one "
+        "week in two, tire quickly and give up early; most profiles are "
+        "nearly empty, what people say they "
         "want is a poor guide to what they respond to, and almost nobody "
         "stays long enough for behaviour to correct it. What people want is "
         "left exactly as in today's world, so any difference comes from the "
@@ -287,7 +314,10 @@ DYSTOPIA = Preset(
         "yes_rate_spread": 1.00,
         "desirability_consensus": 0.60,
         "decision_noise": 0.20,
-        "active_share": 0.55,
+        "open_rate": 0.55,
+        "fatigue": 0.30,
+        "patience": 3.0,
+        "intent_openness": 0.60,
         "self_knowledge": 0.35,
         "onboarding_reach": 0.50,
         "match_feedback_reach": 0.15,
@@ -310,7 +340,10 @@ DYSTOPIA = Preset(
             "so attention concentrates on a small share of people. Assumption."
         ),
         "decision_noise": "Tired, distrustful users decide less consistently. Assumption.",
-        "active_share": "Nearly half the profiles never answer. Assumption.",
+        "open_rate": "A typical person opens the app barely one week in two. Assumption.",
+        "fatigue": "Each letdown costs twice the willingness it does today. Assumption.",
+        "patience": "People give up after about three letdowns, not six. Assumption.",
+        "intent_openness": "Four in ten say what they think will be accepted. Assumption.",
         "self_knowledge": (
             "Barely better than guessing among three levels: stated preferences "
             "are aspirational or performed. Assumption."

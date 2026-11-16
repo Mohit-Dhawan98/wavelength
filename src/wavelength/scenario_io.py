@@ -78,7 +78,11 @@ def _merge_archetypes(current: dict[str, Any], changes: Mapping[str, Any]) -> tu
 
 
 #: Fields that were renamed, so an old file or command gets a useful message.
-_RENAMED = {"pickiness": "yes_rate", "pickiness_spread": "yes_rate_spread"}
+_RENAMED = {
+    "pickiness": "yes_rate",
+    "pickiness_spread": "yes_rate_spread",
+    "active_share": "open_rate",
+}
 
 
 def _renamed_hint(names: Sequence[str]) -> str:
@@ -139,7 +143,7 @@ def _is_distribution(path: Sequence[str]) -> bool:
         return len(path) == 4 or (len(path) == 3 and path[2] == "share")
     if path[0] == "trait_shares":
         return len(path) == 3
-    return path[0] == "attraction_mix" and len(path) == 2
+    return path[0] in ("attraction_mix", "community_shares") and len(path) == 2
 
 
 def _rescale_siblings(key: str, siblings: dict[str, float], own: str, value: Any) -> None:

@@ -1,32 +1,33 @@
-"""Who would really say yes to whom.
+"""Who would really say yes to whom when introduced.
 
-This is the second half of the hidden truth, and the part that keeps the
-simulation from being circular. If simulated people accepted according to
-the matcher's own score, any matcher would look perfect. So the decision
-rule here is built from the true quantities the matcher never sees, and
-differs from the matcher's score in form as well as inputs:
+This is the first stage of the hidden answer key (``key.py`` has the rest),
+and the part that keeps the simulation from being circular. If simulated
+people accepted according to a matcher's own score, any matcher would look
+perfect. So the decision is built from quantities no rule ever sees, and
+differs from a matcher's score in form as well as inputs:
 
-- it uses each person's true feature values and true importance weights,
-  not the extracted values and learned weights;
-- a true dealbreaker is a refusal, not a large term in an average;
-- part of attraction is the other person's general appeal, which this
-  repository's matchers have no signal for;
-- part is chemistry, some of it shared by the pair, which nothing can
-  observe;
+- it uses each person's true feature values and true priorities, not the
+  extracted values and learned weights;
+- a dealbreaker the person can see in the introduction is a refusal, not a
+  large term in an average;
+- part of attraction is the other person's general appeal;
+- part is chemistry, some of it shared by the pair;
 - part of any single decision is mood on the day.
 
 A person says yes when what they feel clears their own bar. The bar is an
-absolute level of attraction, fixed per person before any matcher runs. It
-is placed so that the person would say yes to their own ``yes_rate`` share
-of eligible people picked at random. Being shown better-than-random people
+absolute level of attraction, fixed per person before any rule runs. It is
+placed so that the person would say yes to their own ``yes_rate`` share of
+eligible people picked at random. Being shown better-than-random people
 therefore produces more yeses, and by how much is not set anywhere: it
-follows from how well a matcher's ranking tracks true attraction.
+follows from how well a rule's choices track true attraction.
 
-Responding is separate from deciding. ``would_accept`` is the decision each
-person would make; ``responds`` says whether they answer at all.
+Everything random here is drawn once, from the world's seed, before any
+rule runs. Two rules introduced to the same pair get the same answer.
 
-The simulation shows what follows from these premises in a given world. It
-cannot show that the premises are true.
+What a person can see in an introduction is what the other person states:
+their four dealbreaker answers and their community. Dealbreakers that are
+not in a profile (and intent that was not stated honestly) surface later,
+in person; see ``key.py``.
 """
 
 from __future__ import annotations
@@ -38,7 +39,7 @@ import numpy as np
 from wavelength.features import FEATURE_NAMES, FEATURES
 from wavelength.filters import eligibility_matrix
 from wavelength.population import TIERS, Population
-from wavelength.scenario import Scenario
+from wavelength.scenario import DEALBREAKER_FEATURES, Scenario
 from wavelength.weights import Tier
 
 #: A person for whom a feature is a true dealbreaker refuses anyone at least
@@ -54,6 +55,9 @@ MIN_REFERENCE = 8
 #: Personal yes-rates are kept inside this range whatever the spread.
 YES_RATE_LIMITS = (0.01, 0.95)
 
+#: Weeks of app-opening luck drawn per person. A run can be at most this long.
+MAX_ROUNDS = 52
+
 _ALPHA = TIERS.index(Tier.ALPHA)
 
 
@@ -62,41 +66,68 @@ class Decisions:
     """What each person would do if introduced to each other person."""
 
     felt: np.ndarray  # (n, n) what row feels about column on the day: attraction plus mood
-    would_accept: np.ndarray  # (n, n) bool: row's decision about column, if row responds
-    responds: np.ndarray  # (n,) bool: answers introductions at all
+    would_accept: np.ndarray  # (n, n) bool: row's decision about column, if row answers
     yes_rate: np.ndarray  # (n,) each person's own yes-rate to a random eligible person
     bar: np.ndarray  # (n,) the level of felt attraction each person needs to say yes
-    refuses: np.ndarray  # (n, n) bool: row has a true dealbreaker against column
+    refuses: np.ndarray  # (n, n) bool: row refuses column on what column's profile states
+    refuses_in_person: np.ndarray  # (n, n) bool: row has any true dealbreaker against column
     eligible: np.ndarray  # (n, n) bool: opposite sides and clear of the hard filters, truly
+    profile: np.ndarray  # (n, n) the part of attraction a perfect read of profiles explains
+    chemistry: np.ndarray  # (n, n) row's chemistry with column: shared part plus their own
+    shared_chemistry: np.ndarray  # (n, n) symmetric: the part of chemistry both feel
+    open_luck: np.ndarray  # (n, MAX_ROUNDS) uniform draws: does the person open the app that week
+    habit: np.ndarray  # (n,) each person's chance of opening the app in a week
+
+    @property
+    def responds(self) -> np.ndarray:
+        """Who answers in the first week, before anyone has been let down."""
+        return self.open_luck[:, 0] < self.habit
 
     @property
     def accepts(self) -> np.ndarray:
-        """``[a, b]`` is True when a responds and says yes to b."""
+        """``[a, b]`` is True when a answers in the first week and says yes to b."""
         return self.would_accept & self.responds[:, None]
 
 
-def _standardise(x: np.ndarray, mask: np.ndarray) -> np.ndarray:
+def standardise(x: np.ndarray, mask: np.ndarray) -> np.ndarray:
     """Rescale to mean 0 and spread 1 over the pairs that could be introduced."""
     values = x[mask]
-    spread = values.std()
+    spread = values.std() if values.size else 0.0
     if spread == 0.0:
-        return np.zeros_like(x)
+        return np.zeros_like(x, dtype=float)
     return (x - values.mean()) / spread
 
 
-def _fit_and_refusals(population: Population) -> tuple[np.ndarray, np.ndarray]:
-    """Agreement on features by the viewer's true weights, and true dealbreaker hits."""
+def feature_distances(codes_a: np.ndarray, codes_b: np.ndarray, name: str) -> np.ndarray:
+    """Distance on one feature between every row person's value and every column person's."""
+    j = FEATURE_NAMES.index(name)
+    return FEATURES[name].distances[codes_a[:, j][:, None], codes_b[:, j][None, :]]
+
+
+def fit_and_refusals(population: Population) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Fit by the viewer's true priorities, refusals on a profile, and refusals in person.
+
+    A refusal on a profile needs a dealbreaker the profile shows: one of the
+    four stated answers, clearly different from the viewer's own, or a
+    different community when the viewer will not go outside theirs. A
+    refusal in person uses every true dealbreaker and the other's true
+    values, including whatever a profile did not show or did not say truly.
+    """
     n = population.n
-    weighted_distance = np.zeros((n, n))
-    refuses = np.zeros((n, n), dtype=bool)
+    distance_by_importance = np.zeros((n, n))
+    on_profile = np.zeros((n, n), dtype=bool)
+    in_person = np.zeros((n, n), dtype=bool)
     for j, name in enumerate(FEATURE_NAMES):
-        column = population.codes[:, j]
-        d = FEATURES[name].distances[column[:, None], column[None, :]]
-        weighted_distance += population.weights[:, j][:, None] * d
+        true_gap = feature_distances(population.codes, population.codes, name)
+        distance_by_importance += population.importance[:, j][:, None] * true_gap
         firm = (population.tiers[:, j] == _ALPHA)[:, None]
-        refuses |= firm & (d >= REFUSAL_DISTANCE)
-    fit = 1.0 - weighted_distance / population.weights.sum(axis=1, keepdims=True)
-    return fit, refuses
+        in_person |= firm & (true_gap >= REFUSAL_DISTANCE)
+        if name in DEALBREAKER_FEATURES:
+            stated_gap = feature_distances(population.codes, population.stated_codes, name)
+            on_profile |= firm & (stated_gap >= REFUSAL_DISTANCE)
+    other_community = population.community[:, None] != population.community[None, :]
+    outside = population.endogamous[:, None] & other_community
+    return 1.0 - distance_by_importance, on_profile | outside, in_person | outside
 
 
 def profile_attraction(
@@ -104,49 +135,42 @@ def profile_attraction(
 ) -> np.ndarray:
     """The part of attraction a perfect read of both profiles could explain.
 
-    Personal fit is mixed from values, vibe and lifestyle by
+    Personal fit is mixed from values, vibe, lifestyle and manner by
     ``attraction_mix``, then combined with the other person's general appeal
     by ``desirability_consensus``. Mean 0 and spread about 1 over pairs on
     opposite sides.
     """
     across = population.across
     if fit is None:
-        fit, _ = _fit_and_refusals(population)
+        fit, _, _ = fit_and_refusals(population)
     mix = scenario.attraction_mix
-    personal = (
-        np.sqrt(mix["values"]) * _standardise(fit, across)
-        + np.sqrt(mix["vibe"]) * _standardise(population.vibe @ population.vibe.T, across)
-        + np.sqrt(mix["lifestyle"])
-        * _standardise(population.lifestyle @ population.lifestyle.T, across)
-    )
+    parts = {
+        "values": fit,
+        "vibe": population.vibe @ population.vibe.T,
+        "lifestyle": population.lifestyle @ population.lifestyle.T,
+        "manner": population.manner @ population.manner.T,
+    }
+    personal = sum(np.sqrt(mix[name]) * standardise(part, across) for name, part in parts.items())
     consensus = scenario.desirability_consensus
     return (
-        np.sqrt(1.0 - consensus) * _standardise(personal, across)
+        np.sqrt(1.0 - consensus) * standardise(personal, across)
         + np.sqrt(consensus) * population.appeal[None, :]
     )
 
 
-def attraction(
-    rng: np.random.Generator,
-    scenario: Scenario,
-    population: Population,
-    fit: np.ndarray | None = None,
-) -> np.ndarray:
-    """How drawn each person (row) is to each other person (column), lastingly.
+def draw_chemistry(
+    rng: np.random.Generator, scenario: Scenario, n: int
+) -> tuple[np.ndarray, np.ndarray]:
+    """Chemistry per ordered pair, and the part of it that both people feel.
 
-    ``profile_attraction`` plus chemistry, by ``chemistry_share``. Chemistry
-    is drawn per pair; ``chemistry_mutuality`` of it is the same in both
-    directions and the rest is each person's own.
+    ``chemistry_mutuality`` of each person's chemistry is the pair's shared
+    spark; the rest is their own.
     """
-    n = population.n
-    one_way = rng.standard_normal((n, n))
     upper = np.triu(rng.standard_normal((n, n)), k=1)
-    both_ways = upper + upper.T
+    shared = upper + upper.T
+    own = rng.standard_normal((n, n))
     mutuality = scenario.chemistry_mutuality
-    chemistry = np.sqrt(mutuality) * both_ways + np.sqrt(1.0 - mutuality) * one_way
-    share = scenario.chemistry_share
-    explained = profile_attraction(scenario, population, fit)
-    return np.sqrt(1.0 - share) * explained + np.sqrt(share) * chemistry
+    return np.sqrt(mutuality) * shared + np.sqrt(1.0 - mutuality) * own, shared
 
 
 def _yes_rates(rng: np.random.Generator, scenario: Scenario, population: Population) -> np.ndarray:
@@ -193,22 +217,29 @@ def _bars(
 def decide(rng: np.random.Generator, scenario: Scenario, population: Population) -> Decisions:
     """Draw every decision once, so a given introduction has one outcome whoever proposes it."""
     across = population.across
-    fit, refuses = _fit_and_refusals(population)
+    fit, on_profile, in_person = fit_and_refusals(population)
     eligible = eligibility_matrix(population.codes) & across
     yes_rate = _yes_rates(rng, scenario, population)
-    lasting = attraction(rng, scenario, population, fit)
-    noise = scenario.decision_noise
+    profile = profile_attraction(scenario, population, fit)
+    chemistry, shared = draw_chemistry(rng, scenario, population.n)
+    share, noise = scenario.chemistry_share, scenario.decision_noise
+    lasting = np.sqrt(1.0 - share) * profile + np.sqrt(share) * chemistry
     mood = rng.standard_normal(lasting.shape)
     felt = np.sqrt(1.0 - noise) * lasting + np.sqrt(noise) * mood
 
-    open_to = across & ~refuses
+    open_to = across & ~on_profile
     bar = _bars(felt, open_to, eligible, yes_rate)
     return Decisions(
         felt=felt,
         would_accept=open_to & (felt >= bar[:, None]),
-        responds=population.active,
         yes_rate=yes_rate,
         bar=bar,
-        refuses=refuses,
+        refuses=on_profile,
+        refuses_in_person=in_person,
         eligible=eligible,
+        profile=profile,
+        chemistry=chemistry,
+        shared_chemistry=shared,
+        open_luck=rng.random((population.n, MAX_ROUNDS)),
+        habit=population.habit,
     )

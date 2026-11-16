@@ -22,8 +22,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from wavelength.decisions import profile_attraction
 from wavelength.strategies import global_scores, observed_eligibility, personal_scores
+from wavelength.view import Board
 from wavelength.world import World
 
 #: A person needs at least this many candidates for a rank correlation to mean anything.
@@ -57,6 +57,21 @@ class WorldCheck:
 
     global_score_tracks_feeling: float
     """The same for the score with global weights."""
+
+    text_tracks_feeling: float
+    """The same for the text channel alone."""
+
+    photo_tracks_feeling: float
+    """The same for the photo channel alone."""
+
+    voice_tracks_feeling: float
+    """The same for the voice channel alone."""
+
+    features_personal_track_feeling: float
+    """The same for agreement on structured features by each person's learned weights."""
+
+    features_global_track_feeling: float
+    """The same for agreement on structured features by one global set of weights."""
 
     profile_tracks_feeling: float
     """The same for a perfect read of both profiles including general appeal: the
@@ -97,6 +112,11 @@ def check_world(world: World) -> WorldCheck:
 
     truly_eligible = decisions.eligible
     felt = decisions.felt
+    board = Board(obs.copy())
+
+    def tracks(score: np.ndarray) -> float:
+        return mean_rank_correlation(score, felt, seen_eligible)
+
     return WorldCheck(
         yes_rate_realised=float(
             (decisions.would_accept & truly_eligible).sum() / max(truly_eligible.sum(), 1)
@@ -107,7 +127,10 @@ def check_world(world: World) -> WorldCheck:
         candidates_minority=median_candidates(~population.majority),
         score_tracks_feeling=mean_rank_correlation(personal_scores(obs), felt, seen_eligible),
         global_score_tracks_feeling=mean_rank_correlation(global_scores(obs), felt, seen_eligible),
-        profile_tracks_feeling=mean_rank_correlation(
-            profile_attraction(world.population.scenario, population), felt, seen_eligible
-        ),
+        text_tracks_feeling=tracks(board.text),
+        photo_tracks_feeling=tracks(board.photo),
+        voice_tracks_feeling=tracks(board.voice),
+        features_personal_track_feeling=tracks(board.feature_similarity(obs.weights)),
+        features_global_track_feeling=tracks(board.feature_similarity(board.global_weights)),
+        profile_tracks_feeling=tracks(decisions.profile),
     )

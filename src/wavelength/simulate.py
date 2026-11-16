@@ -68,7 +68,8 @@ class StrategyStats:
     responded: int = 0  # pairs in which both people answered
     mutual: int = 0  # pairs in which both answered yes
     one_sided: int = 0  # pairs with exactly one yes, whatever the other did
-    violations: int = 0
+    violations: int = 0  # pairs that break a dealbreaker the app knew about
+    hidden_mismatches: int = 0  # pairs that looked fine and truly fail a hard filter
 
     @staticmethod
     def _rate(count: int, out_of: int) -> float:
@@ -96,8 +97,17 @@ class StrategyStats:
 
     @property
     def violation_rate(self) -> float:
-        """Share of proposed pairs that break a hard filter on the true values."""
+        """Share of proposed pairs that break a dealbreaker the app knew about."""
         return self._rate(self.violations, self.pairs)
+
+    @property
+    def hidden_mismatch_rate(self) -> float:
+        """Share of proposed pairs that looked fine and truly fail a hard filter.
+
+        These come from intent that was not stated as it is; no rule could
+        have seen them.
+        """
+        return self._rate(self.hidden_mismatches, self.pairs)
 
     @property
     def unproposed_share(self) -> float:
@@ -255,6 +265,7 @@ def _score(
 ) -> None:
     """Look up how each proposal would really have gone and add it to the counts."""
     decisions, majority = world.decisions, world.population.majority
+    known_ok = world.observations.known_ok
     truly_eligible = decisions.eligible  # proposals always cross sides
     tally.users += world.population.n
     responds, would_accept = decisions.responds, decisions.would_accept
@@ -266,7 +277,8 @@ def _score(
         tally.responded += both_responded
         tally.mutual += a_yes and b_yes
         tally.one_sided += a_yes != b_yes
-        tally.violations += not truly_eligible[p.a, p.b]
+        tally.violations += not known_ok[p.a, p.b]
+        tally.hidden_mismatches += bool(known_ok[p.a, p.b] and not truly_eligible[p.a, p.b])
         if calibration is not None and p.predicted is not None and both_responded:
             first_yes, second_yes = (a_yes, b_yes) if majority[p.a] else (b_yes, a_yes)
             calibration.add(p.predicted, first_yes, second_yes)

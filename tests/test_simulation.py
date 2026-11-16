@@ -32,8 +32,8 @@ def _column(name):
     return FEATURE_NAMES.index(name)
 
 
-def _population(name, n=BIG, seed=0):
-    scenario = dataclasses.replace(PRESETS[name].scenario, pool_size=n)
+def _population(name, n=BIG, seed=0, **changes):
+    scenario = dataclasses.replace(PRESETS[name].scenario, pool_size=n, **changes)
     return scenario, generate_population(np.random.default_rng(seed), scenario)
 
 
@@ -42,7 +42,7 @@ def _population(name, n=BIG, seed=0):
 
 @pytest.mark.parametrize("name", list(PRESETS))
 def test_dealbreaker_values_match_the_configured_shares(name):
-    scenario, people = _population(name)
+    scenario, people = _population(name, marriage_pressure=0.0)
     for feature in DEALBREAKER_FEATURES:
         expected = scenario.value_shares(feature)
         for code, value in enumerate(FEATURES[feature].values):
@@ -56,11 +56,11 @@ def test_archetype_and_side_shares(name):
     for index, kind in enumerate(scenario.archetypes):
         assert np.mean(people.archetype == index) == pytest.approx(kind.share, abs=0.025)
     assert people.majority.mean() == pytest.approx(scenario.majority_share, abs=1 / BIG)
-    assert people.active.mean() == pytest.approx(scenario.active_share, abs=0.025)
+    assert people.habit.mean() == pytest.approx(scenario.open_rate, abs=0.025)
 
 
 def test_dealbreakers_are_correlated_through_archetypes():
-    _, people = _population("today")
+    _, people = _population("today", marriage_pressure=0.0)
     timeline = people.codes[:, _column("relationship_timeline")]
     family = people.codes[:, _column("family_plans")]
     soon = FEATURES["family_plans"].code("wants_children_soon")
@@ -147,7 +147,7 @@ def test_mood_changes_single_decisions_and_shared_chemistry_links_the_pair():
 def test_not_responding_is_separate_from_saying_no():
     world = generate_world(3, dataclasses.replace(PRESETS["serious"].scenario, pool_size=300))
     people, decisions = world.population, world.decisions
-    assert np.array_equal(decisions.responds, people.active)
+    assert np.array_equal(decisions.responds, decisions.open_luck[:, 0] < people.habit)
     silent = ~decisions.responds
     assert silent.any() and decisions.would_accept[silent].any()  # they had an opinion
     assert not decisions.accepts[silent].any()  # but nobody heard it
@@ -196,7 +196,7 @@ def test_observed_coverage_matches_the_scenario(name):
     assert complete.mean() >= scenario.full_profile_share - 0.02
 
 
-def test_observed_dealbreakers_are_never_wrong_only_missing():
+def test_observed_dealbreakers_are_as_stated_or_missing():
     scenario, people = _population("dystopia", n=2000)
     seen = observe(
         np.random.default_rng(1),
@@ -206,9 +206,13 @@ def test_observed_dealbreakers_are_never_wrong_only_missing():
         people,
     )
     for feature in DEALBREAKER_FEATURES:
-        observed, true = seen.codes[:, _column(feature)], people.codes[:, _column(feature)]
+        observed, stated = seen.codes[:, _column(feature)], people.stated_codes[:, _column(feature)]
         known = observed != MISSING
-        assert (observed[known] == true[known]).all()
+        assert (observed[known] == stated[known]).all()
+    # What people state is the truth for everyone who is open about intent.
+    open_ = people.open_about_intent
+    assert np.array_equal(people.stated_codes[open_], people.codes[open_])
+    assert (people.stated_codes[~open_] != people.codes[~open_]).any()
 
 
 def test_better_sources_override_stated_importance():
@@ -276,16 +280,29 @@ def test_no_strategy_assigns_anyone_twice_or_within_a_side(name):
 
 
 @pytest.mark.parametrize("name", list(PRESETS))
-def test_filtered_strategies_never_break_a_hard_filter_on_true_values(name):
+def test_filtered_strategies_never_break_a_known_dealbreaker(name):
     scenario = dataclasses.replace(PRESETS[name].scenario, pool_size=200)
     for trial in range(2):
         world_seed, order_seed = trial_seeds(0, trial)
         world = generate_world(world_seed, scenario)
-        truly_eligible = eligibility_matrix(world.population.codes)
+        known_ok = world.observations.known_ok
         order = np.random.default_rng(order_seed).permutation(scenario.pool_size)
         for key in FILTERED_STRATEGIES & set(STRATEGIES):
             for p in STRATEGIES[key][1](world.observations, order, 10):
-                assert truly_eligible[p.a, p.b]
+                assert known_ok[p.a, p.b]
+
+
+def test_with_everyone_open_about_intent_known_dealbreakers_are_the_true_ones():
+    scenario = dataclasses.replace(
+        Scenario(), pool_size=300, intent_openness=1.0, endogamy_share=0.0
+    )
+    world = generate_world(0, scenario)
+    truly_eligible = eligibility_matrix(world.population.codes)
+    assert not (world.observations.known_ok & ~truly_eligible).any()
+    hidden = dataclasses.replace(scenario, intent_openness=0.5)
+    world = generate_world(0, hidden)
+    truly_eligible = eligibility_matrix(world.population.codes)
+    assert (world.observations.known_ok & ~truly_eligible).any()
 
 
 @pytest.mark.parametrize("name", list(PRESETS))
@@ -320,7 +337,7 @@ def test_answered_and_all_pairs_rates_are_reported_separately(name):
 
 
 def test_everyone_answering_makes_the_two_rates_equal():
-    scenario = dataclasses.replace(Scenario(), active_share=1.0)
+    scenario = dataclasses.replace(Scenario(), open_rate=1.0, open_rate_spread=0.0)
     report = run_simulation(scenario, users=200, trials=1)
     for s in report.strategies.values():
         assert s.responded == s.pairs and s.mutual_rate == s.mutual_rate_responded

@@ -13,7 +13,6 @@ import numpy as np
 
 from wavelength.baselines import one_directional_greedy, similarity_scores
 from wavelength.features import FEATURE_NAMES
-from wavelength.filters import eligibility_matrix
 from wavelength.matching import RankCurve, bidirectional_match
 from wavelength.observation import Observations
 from wavelength.scoring import score_matrix
@@ -61,8 +60,8 @@ def personal_scores(obs: Observations) -> np.ndarray:
 
 
 def observed_eligibility(obs: Observations) -> np.ndarray:
-    """Pairs on opposite sides that clear the hard filters on the values the app has."""
-    return eligibility_matrix(obs.codes) & obs.across
+    """Pairs on opposite sides that break no dealbreaker the app knows about."""
+    return obs.known_ok
 
 
 def filtered_global(obs: Observations, order: np.ndarray, top_n: int) -> list[Proposal]:

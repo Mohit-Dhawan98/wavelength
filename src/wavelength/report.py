@@ -94,6 +94,7 @@ _METRICS: tuple[tuple[str, Callable[[StrategyStats], float], str], ...] = (
     ("no proposal", lambda s: s.unproposed_share, "{:.1%}"),
     ("matches/100", lambda s: s.matches_per_100_users, "{:.1f}"),
     ("violations", lambda s: s.violation_rate, "{:.1%}"),
+    ("hidden mismatch", lambda s: s.hidden_mismatch_rate, "{:.1%}"),
 )
 
 _LEGEND = (
@@ -105,7 +106,8 @@ _LEGEND = (
     "expired: share of all proposed pairs in which at least one person never answered.",
     "no proposal: share of users the strategy left without an introduction this round.",
     "matches/100: pairs in which both said yes, per 100 users in the pool.",
-    "violations: share of proposed pairs that break a hard filter on the true values.",
+    "violations: share of proposed pairs that break a dealbreaker the app knew about.",
+    "hidden mismatch: share that looked fine and truly fail a hard filter (intent not stated).",
 )
 
 
@@ -146,6 +148,17 @@ _WORLD_ROWS: tuple[tuple[str, Callable[[SimulationReport], str]], ...] = (
         "top N as a share of those, scarce side",
         lambda r: _share_of_candidates(r.top_n, r.world.candidates_minority),
     ),
+    ("text alone vs feeling", lambda r: f"{r.world.text_tracks_feeling:.2f}"),
+    ("photo alone vs feeling", lambda r: f"{r.world.photo_tracks_feeling:.2f}"),
+    ("voice alone vs feeling", lambda r: f"{r.world.voice_tracks_feeling:.2f}"),
+    (
+        "features vs feeling, per-user weights",
+        lambda r: f"{r.world.features_personal_track_feeling:.2f}",
+    ),
+    (
+        "features vs feeling, global weights",
+        lambda r: f"{r.world.features_global_track_feeling:.2f}",
+    ),
     ("score vs feeling, per-user weights", lambda r: f"{r.world.score_tracks_feeling:.2f}"),
     ("score vs feeling, global weights", lambda r: f"{r.world.global_score_tracks_feeling:.2f}"),
     (
@@ -156,9 +169,10 @@ _WORLD_ROWS: tuple[tuple[str, Callable[[SimulationReport], str]], ...] = (
 
 _WORLD_LEGEND = (
     "Measured on the first pool, before any strategy runs. Eligible candidates are counted",
-    "on what the app knows. 'Score vs feeling' is the rank correlation, per person, between a",
-    "score and what that person actually feels about each eligible candidate (0 unrelated, 1",
-    "identical); the last row is the most a score built from profiles could reach.",
+    "on what the app knows. 'vs feeling' is the rank correlation, per person, between a signal",
+    "or score and what that person actually feels about each eligible candidate (0 unrelated, 1",
+    "identical). 'Score' is the article's tri-signal mix; the last row is the most any score",
+    "built from profiles could reach.",
 )
 
 

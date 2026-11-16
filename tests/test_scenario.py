@@ -78,7 +78,7 @@ def test_omitted_values_are_zero_and_order_is_fixed():
         ("yes_rate", 1.5),
         ("majority_share", 0.4),
         ("majority_share", 1.0),
-        ("active_share", -0.1),
+        ("open_rate", -0.1),
         ("chemistry_share", 1.1),
         ("self_knowledge", 2.0),
         ("yes_rate_spread", -1.0),
@@ -169,7 +169,7 @@ def test_casual_and_serious_differ_in_dealbreakers_and_yes_rate():
             < serious.dealbreaker_shares[feature]
         )
     assert casual.yes_rate > today.yes_rate > serious.yes_rate
-    assert serious.active_share > today.active_share
+    assert serious.open_rate > today.open_rate
 
 
 def test_dystopia_is_worse_than_today_on_every_input_it_touches():
@@ -182,7 +182,7 @@ def test_dystopia_is_worse_than_today_on_every_input_it_touches():
     assert dystopia.self_knowledge < today.self_knowledge
     assert dystopia.feature_coverage < today.feature_coverage
     assert dystopia.dealbreakers_known_share < today.dealbreakers_known_share
-    assert dystopia.active_share < today.active_share
+    assert dystopia.open_rate < today.open_rate
     assert dystopia.text_signal_quality < today.text_signal_quality
     assert dystopia.archetypes == today.archetypes  # intentions deliberately unchanged
 
@@ -253,7 +253,7 @@ def test_toml_file_builds_on_a_named_preset(tmp_path):
     assert scenario.pool_size == 120 and scenario.yes_rate == 0.15
     assert scenario.dealbreaker_shares["family_plans"] == 0.95
     assert scenario.archetype("settling_down").share == 0.60
-    assert scenario.active_share == serious.active_share  # inherited from the base
+    assert scenario.open_rate == serious.open_rate  # inherited from the base
     assert resolve_scenario(str(path)) == ("small_town", scenario)
 
 
