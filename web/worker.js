@@ -21,6 +21,8 @@ const boot = (async () => {
 const CALLS = {
   run: 'a = json.loads(ARGS)\njson.dumps(web.run(a["settings"], a["rule"], a["seed"], a["people"], a["rounds"]))',
   compare: 'a = json.loads(ARGS)\njson.dumps(web.compare(a["settings"], a["rules"], a["seed"], a["people"], a["rounds"]))',
+  // One run reduced to its score: used for the other seeds, so the page can show a range.
+  brief: 'a = json.loads(ARGS)\nr = web.run(a["settings"], a["rule"], a["seed"], a["people"], a["rounds"])\njson.dumps({k: r[k] for k in ("error", "score", "stages") if k in r})',
 };
 
 onmessage = async e => {

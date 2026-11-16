@@ -32,8 +32,11 @@ see.
    every rule here in every preset world for several seeds and prints the
    table.
 
-3. **Open a pull request** that adds your one file. The tournament runs on
-   the pull request and attaches the leaderboard to it.
+3. **Open a pull request** that adds your one file. Rules from anyone are
+   welcome. A rule is code, so the owner reads and approves each pull
+   request from an outside contributor before the automated scoring runs
+   on it. Once approved, the tournament runs on the pull request and
+   attaches the leaderboard to it.
 
 Give the rule a name nobody else has used, and a docstring saying in one
 line what it does. Keep it to numpy and what `v` offers.
