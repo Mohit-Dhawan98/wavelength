@@ -74,17 +74,17 @@ def test_omitted_values_are_zero_and_order_is_fixed():
 @pytest.mark.parametrize(
     "field, bad",
     [
-        ("pickiness", 0.0),
-        ("pickiness", 1.5),
+        ("yes_rate", 0.0),
+        ("yes_rate", 1.5),
         ("majority_share", 0.4),
         ("majority_share", 1.0),
         ("active_share", -0.1),
         ("chemistry_share", 1.1),
         ("self_knowledge", 2.0),
-        ("pickiness_spread", -1.0),
+        ("yes_rate_spread", -1.0),
         ("pool_size", 5),
         ("pool_size", 300.5),
-        ("pickiness", "high"),
+        ("yes_rate", "high"),
     ],
 )
 def test_out_of_range_values_are_rejected(field, bad):
@@ -122,8 +122,8 @@ def test_implied_value_shares_sum_to_one():
 
 def test_replace_changes_one_field_and_leaves_the_original():
     base = Scenario()
-    changed = dataclasses.replace(base, pickiness=0.08)
-    assert changed.pickiness == 0.08 and base.pickiness != 0.08
+    changed = dataclasses.replace(base, yes_rate=0.08)
+    assert changed.yes_rate == 0.08 and base.yes_rate != 0.08
     assert changed.archetypes == base.archetypes
 
 
@@ -131,7 +131,8 @@ def test_replace_changes_one_field_and_leaves_the_original():
 
 
 def test_the_four_named_presets_exist_and_load():
-    assert list(PRESETS) == ["today", "casual", "serious", "dystopia"]
+    assert list(PRESETS) == ["today", "casual", "serious", "swipe", "dystopia"]
+    assert {p.product for p in PRESETS.values()} == {"introductions", "swipe feed"}
     for p in PRESETS.values():
         assert isinstance(p.scenario, Scenario)
         assert len(p.description) > 100
@@ -159,7 +160,7 @@ def test_casual_and_serious_differ_in_what_people_want():
     assert serious["marriage_focused"] + serious["long_term"] > 0.8
 
 
-def test_casual_and_serious_differ_in_dealbreakers_and_pickiness():
+def test_casual_and_serious_differ_in_dealbreakers_and_yes_rate():
     casual, serious, today = (PRESETS[n].scenario for n in ("casual", "serious", "today"))
     for feature in CORE_FEATURES:
         assert (
@@ -167,7 +168,7 @@ def test_casual_and_serious_differ_in_dealbreakers_and_pickiness():
             < today.dealbreaker_shares[feature]
             < serious.dealbreaker_shares[feature]
         )
-    assert casual.pickiness > today.pickiness > serious.pickiness  # larger = says yes more
+    assert casual.yes_rate > today.yes_rate > serious.yes_rate
     assert serious.active_share > today.active_share
 
 
@@ -175,8 +176,8 @@ def test_dystopia_is_worse_than_today_on_every_input_it_touches():
     dystopia, today = PRESETS["dystopia"].scenario, PRESETS["today"].scenario
     assert dystopia.majority_share > today.majority_share
     assert dystopia.minority_yes_ratio < today.minority_yes_ratio
-    assert dystopia.pickiness < today.pickiness
-    assert dystopia.pickiness_spread > today.pickiness_spread
+    assert dystopia.decision_noise > today.decision_noise
+    assert dystopia.yes_rate_spread > today.yes_rate_spread
     assert dystopia.desirability_consensus > today.desirability_consensus
     assert dystopia.self_knowledge < today.self_knowledge
     assert dystopia.feature_coverage < today.feature_coverage
@@ -239,7 +240,7 @@ def test_toml_file_builds_on_a_named_preset(tmp_path):
     path.write_text(
         'base = "serious"\n'
         "pool_size = 120\n"
-        "pickiness = 0.15\n"
+        "yes_rate = 0.15\n"
         "[dealbreaker_shares]\n"
         "family_plans = 0.95\n"
         "[archetypes.settling_down]\n"
@@ -249,7 +250,7 @@ def test_toml_file_builds_on_a_named_preset(tmp_path):
     )
     scenario = load_scenario_file(path)
     serious = PRESETS["serious"].scenario
-    assert scenario.pool_size == 120 and scenario.pickiness == 0.15
+    assert scenario.pool_size == 120 and scenario.yes_rate == 0.15
     assert scenario.dealbreaker_shares["family_plans"] == 0.95
     assert scenario.archetype("settling_down").share == 0.60
     assert scenario.active_share == serious.active_share  # inherited from the base
@@ -258,8 +259,8 @@ def test_toml_file_builds_on_a_named_preset(tmp_path):
 
 def test_json_file_defaults_to_today(tmp_path):
     path = tmp_path / "picky.json"
-    path.write_text(json.dumps({"pickiness": 0.03}))
-    assert load_scenario_file(path) == dataclasses.replace(Scenario(), pickiness=0.03)
+    path.write_text(json.dumps({"yes_rate": 0.03}))
+    assert load_scenario_file(path) == dataclasses.replace(Scenario(), yes_rate=0.03)
 
 
 def test_bad_scenario_files_are_errors(tmp_path):
@@ -275,8 +276,8 @@ def test_bad_scenario_files_are_errors(tmp_path):
 
 def test_set_overrides_a_single_field():
     base = Scenario()
-    changed = with_overrides(base, ["pickiness=0.08", "pool_size=300"])
-    assert changed == dataclasses.replace(base, pickiness=0.08, pool_size=300)
+    changed = with_overrides(base, ["yes_rate=0.08", "pool_size=300"])
+    assert changed == dataclasses.replace(base, yes_rate=0.08, pool_size=300)
     assert with_overrides(base, []) == base
 
 
@@ -314,13 +315,36 @@ def test_set_on_a_tendency_or_mix_rescales_its_siblings():
 @pytest.mark.parametrize(
     "assignment, message",
     [
-        ("pickiness", "key=value"),
+        ("yes_rate", "key=value"),
         ("nope=1", "not a valid key"),
         ("archetypes.nobody.share=0.5", "not in archetypes"),
-        ("pickiness=7", "pickiness"),
+        ("yes_rate=7", "yes_rate"),
+        ("pickiness=0.1", "pickiness is now yes_rate"),
         ("archetypes.casual.share=1.5", "between 0 and 1"),
     ],
 )
 def test_bad_set_overrides_are_errors(assignment, message):
     with pytest.raises(ValueError, match=message):
         with_overrides(Scenario(), [assignment])
+
+
+def test_swipe_differs_from_today_only_in_product_not_in_people():
+    swipe, today = PRESETS["swipe"].scenario, PRESETS["today"].scenario
+    assert PRESETS["swipe"].product == "swipe feed" and PRESETS["today"].product == "introductions"
+    assert swipe.yes_rate < today.yes_rate / 2
+    assert swipe.decision_noise > today.decision_noise
+    assert swipe.feature_coverage < today.feature_coverage
+    assert swipe.match_feedback_reach < today.match_feedback_reach
+    assert swipe.archetypes == today.archetypes
+    assert swipe.dealbreaker_shares == today.dealbreaker_shares
+
+
+def test_every_preset_description_names_its_product():
+    for p in PRESETS.values():
+        word = "swipe feed" if p.product == "swipe feed" else "introductions"
+        assert word in p.description
+
+
+def test_renamed_fields_get_a_pointer_in_files_too():
+    with pytest.raises(ValueError, match="pickiness is now yes_rate"):
+        from_dict({"pickiness": 0.1})

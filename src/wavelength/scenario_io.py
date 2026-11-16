@@ -77,9 +77,20 @@ def _merge_archetypes(current: dict[str, Any], changes: Mapping[str, Any]) -> tu
     return tuple(archetypes)
 
 
+#: Fields that were renamed, so an old file or command gets a useful message.
+_RENAMED = {"pickiness": "yes_rate", "pickiness_spread": "yes_rate_spread"}
+
+
+def _renamed_hint(names: Sequence[str]) -> str:
+    hints = [f"{old} is now {_RENAMED[old]}" for old in names if old in _RENAMED]
+    return f" ({'; '.join(hints)})" if hints else ""
+
+
 def from_dict(data: Mapping[str, Any], base: Scenario | None = None) -> Scenario:
     """Build a scenario from plain data, starting from ``base`` (default: ``Scenario()``)."""
     unknown = sorted(set(data) - set(_FIELD_NAMES))
+    if unknown and _renamed_hint(unknown):
+        raise ValueError(f"unknown scenario field(s) {unknown}{_renamed_hint(unknown)}")
     if unknown:
         raise ValueError(f"unknown scenario field(s) {unknown}; valid fields: {list(_FIELD_NAMES)}")
     current = to_dict(base if base is not None else Scenario())
@@ -157,6 +168,8 @@ def _set_path(data: dict[str, Any], key: str, value: Any) -> None:
     leaf = path[-1]
     if not isinstance(node, dict) or leaf not in node:
         options = sorted(node) if isinstance(node, dict) else []
+        if leaf in _RENAMED:
+            raise ValueError(f"--set {key}: {leaf} is now {_RENAMED[leaf]}")
         raise ValueError(f"--set {key}: {leaf!r} is not a valid key; valid here: {options}")
 
     if path[0] == "archetypes" and len(path) == 3 and leaf == "share":
@@ -174,7 +187,7 @@ def _set_path(data: dict[str, Any], key: str, value: Any) -> None:
 def with_overrides(scenario: Scenario, assignments: Sequence[str]) -> Scenario:
     """Apply ``key=value`` overrides, as given to ``--set``, in order.
 
-    Keys are dotted paths into the plain-data form: ``pickiness``,
+    Keys are dotted paths into the plain-data form: ``yes_rate``,
     ``dealbreaker_shares.family_plans``, ``archetypes.casual.share``,
     ``archetypes.casual.relationship_timeline.casual``.
     """

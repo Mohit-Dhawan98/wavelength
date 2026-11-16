@@ -14,16 +14,21 @@ Module map, in the order the pipeline runs:
 - ``matching``   mutual top-N, success probability, greedy assignment
 - ``baselines``  similarity-only and one-directional strategies
 
+- ``calibration``  fit ``P(accept | rank)`` from observed decisions
+
 The simulation, which runs those strategies in a made-up world whose
 assumptions are stated as named parameters:
 
 - ``scenario``     the assumptions about a world, as documented fields
-- ``presets``      named worlds: today, casual, serious, dystopia
+- ``presets``      named worlds: today, casual, serious, swipe, dystopia
 - ``scenario_io``  scenarios as plain data: files and ``--set`` overrides
 - ``population``   hidden truth: who the simulated people are
 - ``decisions``    hidden truth: who would say yes to whom
 - ``observation``  what the app has learned; all a matcher sees
-- ``simulate``     the three strategies on the same people, and the score
+- ``world``        one pool: truth and observations from one seed
+- ``strategies``   the three strategies, as functions of the observations
+- ``diagnostics``  facts about a world to read before any score
+- ``simulate``     run, score and (optionally) calibrate
 - ``report``       plain-text rendering
 - ``cli``          the ``wavelength`` command
 """

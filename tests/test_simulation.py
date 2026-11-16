@@ -19,15 +19,10 @@ from wavelength.population import TIERS, generate_population
 from wavelength.presets import PRESETS
 from wavelength.report import format_comparison, format_report
 from wavelength.scenario import CORE_FEATURES, DEALBREAKER_FEATURES, Scenario
-from wavelength.simulate import (
-    FILTERED_STRATEGIES,
-    STRATEGIES,
-    check_round,
-    generate_world,
-    run_simulation,
-    trial_seeds,
-)
+from wavelength.simulate import check_round, run_simulation, trial_seeds
+from wavelength.strategies import FILTERED_STRATEGIES, STRATEGIES, Proposal
 from wavelength.weights import Tier
+from wavelength.world import generate_world
 
 BIG = 6000  # people, for checks on shares; no pairwise work is done at this size
 SMALL = dict(users=160, trials=2)
@@ -83,25 +78,87 @@ def test_true_dealbreaker_shares_match_the_scenario(name):
         assert observed == pytest.approx(scenario.dealbreaker_shares[feature], abs=0.025)
 
 
-def test_people_say_yes_at_the_configured_rate():
-    scenario = dataclasses.replace(
-        Scenario(), pool_size=800, pickiness_spread=0.0, active_share=1.0
-    )
+def _yes_rate_to_random_eligible(decisions, side):
+    eligible = decisions.eligible[side]
+    return (decisions.would_accept[side] & eligible).sum() / eligible.sum()
+
+
+@pytest.mark.parametrize("name", list(PRESETS))
+def test_realised_yes_rate_to_random_eligible_people_matches_the_scenario(name):
+    scenario = dataclasses.replace(PRESETS[name].scenario, pool_size=900)
     people = generate_population(np.random.default_rng(0), scenario)
     decisions = decide(np.random.default_rng(1), scenario, people)
-    rate = decisions.accepts.sum(axis=1) / people.across.sum(axis=1)
-    assert rate[people.majority].mean() == pytest.approx(scenario.pickiness, abs=0.01)
-    assert rate[~people.majority].mean() == pytest.approx(
-        scenario.pickiness * scenario.minority_yes_ratio, abs=0.01
-    )
+    majority = _yes_rate_to_random_eligible(decisions, people.majority)
+    minority = _yes_rate_to_random_eligible(decisions, ~people.majority)
+    # Personal rates are clipped to a range, which pulls wide spreads in slightly.
+    assert majority == pytest.approx(scenario.yes_rate, rel=0.15)
+    assert minority == pytest.approx(scenario.yes_rate * scenario.minority_yes_ratio, rel=0.15)
 
 
-def test_decisions_respect_sides_dealbreakers_and_inactivity():
+def test_each_person_meets_their_own_yes_rate():
+    scenario = dataclasses.replace(Scenario(), pool_size=900)
+    people = generate_population(np.random.default_rng(0), scenario)
+    decisions = decide(np.random.default_rng(1), scenario, people)
+    n_eligible = decisions.eligible.sum(axis=1)
+    enough = n_eligible >= 30
+    yeses = (decisions.would_accept & decisions.eligible).sum(axis=1)
+    realised = yeses[enough] / n_eligible[enough]
+    # Nobody can say yes to more people than survive their own dealbreakers.
+    not_refused = (decisions.eligible & ~decisions.refuses).sum(axis=1)[enough] / n_eligible[enough]
+    target = np.minimum(decisions.yes_rate[enough], not_refused)
+    assert np.abs(realised - target).max() < 0.05
+    assert decisions.yes_rate.std() > 0.05  # people differ
+
+
+def test_the_bar_is_absolute_so_better_candidates_get_more_yeses():
+    scenario = dataclasses.replace(Scenario(), pool_size=600)
+    people = generate_population(np.random.default_rng(0), scenario)
+    decisions = decide(np.random.default_rng(1), scenario, people)
+    # A yes is exactly "felt attraction clears the person's bar and no dealbreaker is hit".
+    expected = people.across & ~decisions.refuses & (decisions.felt >= decisions.bar[:, None])
+    assert np.array_equal(decisions.would_accept, expected)
+    # So among eligible candidates, the ones a person feels most for are accepted most.
+    some = decisions.eligible.any(axis=1)
+    felt = np.where(decisions.eligible, decisions.felt, np.nan)[some]
+    above_median = felt >= np.nanmedian(felt, axis=1, keepdims=True)
+    eligible, would_accept = decisions.eligible[some], decisions.would_accept[some]
+    top = would_accept[eligible & above_median].mean()
+    bottom = would_accept[eligible & ~above_median].mean()
+    assert bottom < scenario.yes_rate < top
+
+
+def test_mood_changes_single_decisions_and_shared_chemistry_links_the_pair():
+    def both_and_product(**changes):
+        scenario = dataclasses.replace(Scenario(), pool_size=700, yes_rate_spread=0.0, **changes)
+        people = generate_population(np.random.default_rng(0), scenario)
+        d = decide(np.random.default_rng(1), scenario, people)
+        pairs = d.eligible & people.majority[:, None]
+        yes, back = d.would_accept[pairs], d.would_accept.T[pairs]
+        return (yes & back).mean(), yes.mean() * back.mean(), d
+
+    both, product, calm = both_and_product(chemistry_share=0.9, chemistry_mutuality=1.0)
+    assert both > 1.5 * product  # shared chemistry: the two decisions move together
+    both, product, _ = both_and_product(chemistry_share=0.9, chemistry_mutuality=0.0)
+    assert both < 1.5 * product
+    _, _, moody = both_and_product(chemistry_share=0.9, chemistry_mutuality=1.0, decision_noise=0.4)
+    assert (calm.would_accept != moody.would_accept).any()
+
+
+def test_not_responding_is_separate_from_saying_no():
     world = generate_world(3, dataclasses.replace(PRESETS["serious"].scenario, pool_size=300))
-    people, accepts = world.population, world.decisions.accepts
-    assert not accepts[~people.across].any()
-    assert not accepts[world.decisions.refuses].any()
-    assert not accepts[~people.active].any()
+    people, decisions = world.population, world.decisions
+    assert np.array_equal(decisions.responds, people.active)
+    silent = ~decisions.responds
+    assert silent.any() and decisions.would_accept[silent].any()  # they had an opinion
+    assert not decisions.accepts[silent].any()  # but nobody heard it
+    assert np.array_equal(decisions.accepts[~silent], decisions.would_accept[~silent])
+
+
+def test_decisions_respect_sides_and_dealbreakers():
+    world = generate_world(3, dataclasses.replace(PRESETS["serious"].scenario, pool_size=300))
+    people, would_accept = world.population, world.decisions.would_accept
+    assert not would_accept[~people.across].any()
+    assert not would_accept[world.decisions.refuses].any()
     # A refusal is a true dealbreaker held by the refuser and a clear gap on it.
     a, b = np.argwhere(world.decisions.refuses)[0]
     assert any(
@@ -175,7 +232,7 @@ def test_better_sources_override_stated_importance():
 
 def _counts(report):
     return {
-        key: (s.users, s.pairs, s.mutual, s.one_sided, s.violations)
+        key: (s.users, s.pairs, s.responded, s.mutual, s.one_sided, s.violations)
         for key, s in report.strategies.items()
     }
 
@@ -226,7 +283,7 @@ def test_filtered_strategies_never_break_a_hard_filter_on_true_values(name):
         world = generate_world(world_seed, scenario)
         truly_eligible = eligibility_matrix(world.population.codes)
         order = np.random.default_rng(order_seed).permutation(scenario.pool_size)
-        for key in FILTERED_STRATEGIES:
+        for key in FILTERED_STRATEGIES & set(STRATEGIES):
             for p in STRATEGIES[key][1](world.observations, order, 10):
                 assert truly_eligible[p.a, p.b]
 
@@ -243,16 +300,47 @@ def test_report_counts_are_consistent(name):
         assert s.matches_per_100_users == pytest.approx(100 * s.mutual / s.users)
         if key in FILTERED_STRATEGIES:
             assert s.violations == 0
-    predicted = sum(b.pairs for b in report.calibration)
-    assert predicted == report.strategies["bidirectional"].pairs
-    for b in report.calibration:
+    calibration = report.calibrations["bidirectional"]
+    assert calibration.pairs == report.strategies["bidirectional"].responded
+    for b in calibration.bins:
         if b.pairs:
             assert b.low <= b.mean_predicted <= b.high and 0.0 <= b.observed <= 1.0
 
 
-def test_check_round_catches_a_double_assignment():
-    from wavelength.simulate import Proposal
+@pytest.mark.parametrize("name", list(PRESETS))
+def test_answered_and_all_pairs_rates_are_reported_separately(name):
+    report = run_simulation(PRESETS[name].scenario, name=name, users=300, trials=2)
+    for s in report.strategies.values():
+        assert 0 < s.responded < s.pairs  # some introductions expire in every preset
+        assert s.mutual <= s.responded
+        assert s.mutual_rate == pytest.approx(s.mutual / s.pairs)
+        assert s.mutual_rate_responded == pytest.approx(s.mutual / s.responded)
+        assert s.mutual_rate_responded >= s.mutual_rate
+        assert s.expired_rate == pytest.approx(1 - s.responded / s.pairs)
 
+
+def test_everyone_answering_makes_the_two_rates_equal():
+    scenario = dataclasses.replace(Scenario(), active_share=1.0)
+    report = run_simulation(scenario, users=200, trials=1)
+    for s in report.strategies.values():
+        assert s.responded == s.pairs and s.mutual_rate == s.mutual_rate_responded
+
+
+@pytest.mark.parametrize("name", list(PRESETS))
+def test_every_preset_world_is_informative_at_default_size(name):
+    """A floor on the world, not a verdict on any strategy.
+
+    A preset in which almost nobody ever matches cannot tell strategies
+    apart, however it is read. Each one must give at least one strategy a
+    workable number of mutual matches in a default run, and leave a typical
+    person more eligible candidates than the top-N cutoff.
+    """
+    report = run_simulation(PRESETS[name].scenario, name=name)
+    assert max(s.mutual for s in report.strategies.values()) >= 15
+    assert min(report.world.candidates_majority, report.world.candidates_minority) > report.top_n
+
+
+def test_check_round_catches_a_double_assignment():
     with pytest.raises(AssertionError):
         check_round([Proposal(0, 1), Proposal(1, 2)])
 
@@ -273,6 +361,10 @@ def test_reports_say_what_they_are():
         for label, _ in STRATEGIES.values():
             assert label in text
     assert "Calibration of predicted P(mutual)" in single
+    assert "about this world" in single and "about each world" in both
+    for text in (single, both):
+        assert "both yes (all)" in text and "both yes (answered)" in text
+        assert "fair test of the matcher" in text and "what the product delivers" in text
     assert "today" in both and "casual" in both
 
 
@@ -295,8 +387,8 @@ def test_cli_describe_prints_every_field(name, capsys):
 
 
 def test_cli_describe_reflects_set(capsys):
-    assert main(["describe", "today", "--set", "pickiness=0.08"]) == 0
-    assert "pickiness = 0.08" in capsys.readouterr().out
+    assert main(["describe", "today", "--set", "yes_rate=0.08"]) == 0
+    assert "yes_rate = 0.08" in capsys.readouterr().out
 
 
 def test_cli_simulate_runs_and_is_deterministic(capsys):
@@ -314,13 +406,13 @@ def test_cli_simulate_with_set_and_compare(capsys):
         "--scenario",
         "today",
         "--set",
-        "pickiness=0.08",
+        "yes_rate=0.08",
         "--users",
         "120",
         "--trials",
         "1",
         "--compare",
-        "casual,serious,dystopia",
+        "casual,serious,swipe,dystopia",
     ]
     assert main(args) == 0
     out = capsys.readouterr().out
@@ -342,3 +434,14 @@ def test_cli_reports_bad_input_without_a_traceback(capsys):
     assert "not a valid key" in capsys.readouterr().err
     assert main(["describe", "utopia"]) == 2
     assert "neither a preset" in capsys.readouterr().err
+
+
+def test_cli_calibrate_shows_both_curves_side_by_side(capsys):
+    args = ["simulate", "--scenario", "today", "--users", "300", "--trials", "2", "--calibrate"]
+    assert main(args) == 0
+    out = capsys.readouterr().out
+    assert "P(accept) by rank" in out
+    assert "article's curve" in out and "fitted curve" in out
+    assert "P(mutual) from the article's curve" in out and "P(mutual) from the fitted curve" in out
+    assert "if independent" in out
+    assert "3 again, with the fitted P(rank)" in out

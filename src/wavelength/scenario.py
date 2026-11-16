@@ -228,7 +228,7 @@ _DEFAULT_ATTRACTION_MIX: dict[str, float] = {"values": 0.50, "vibe": 0.30, "life
 class Scenario:
     """Every assumption about one simulated world.
 
-    Change a field with ``dataclasses.replace(scenario, pickiness=0.05)``,
+    Change a field with ``dataclasses.replace(scenario, yes_rate=0.2)``,
     with a scenario file, or with ``--set`` on the command line; see
     ``scenario_io``. Construction validates everything, so an impossible
     world (shares that do not sum to 1, a probability above 1) is an error
@@ -238,16 +238,22 @@ class Scenario:
     # --- The market -------------------------------------------------------
 
     pool_size: int = _knob(
-        600,
+        1200,
         group=_MARKET,
         meaning=(
             "People in one matching pool: everyone who could in principle be "
             "introduced to each other, such as one city's users in one age band."
         ),
-        sensible="100 (a small town or a new app) to 2000. Memory and time grow with its square.",
+        sensible=(
+            "300 (a small town or a new app) to 3000. Memory and time grow with "
+            "its square. Below a few hundred, a person's top 10 is most of the "
+            "people they are eligible for, and 'near the top of the list' stops "
+            "meaning much; `wavelength simulate` prints the eligible-pool size."
+        ),
         basis=(
-            "assumption. Chosen so a run takes seconds; the article's app had "
-            "100K+ users across many such pools."
+            "assumption. Large enough that a typical person has several dozen "
+            "eligible candidates, small enough that a run takes seconds. The "
+            "article's app had 100K+ users across many such pools."
         ),
     )
     majority_share: float = _knob(
@@ -268,9 +274,10 @@ class Scenario:
         0.70,
         group=_MARKET,
         meaning=(
-            "Share of people in the pool who respond to an introduction at all. "
-            "The rest still have profiles and can be proposed, but never answer. "
-            "The matcher cannot tell them apart."
+            "Share of people who answer an introduction before it expires. The "
+            "rest still have profiles and can be proposed, but whatever they are "
+            "sent lapses unanswered. An expiry is not a no: the report counts it "
+            "separately. The matcher cannot tell who will answer."
         ),
         sensible="0.30 (mostly abandoned profiles) to 0.95 (a paid, high-intent service).",
         basis="assumption.",
@@ -347,26 +354,35 @@ class Scenario:
 
     # --- How people choose ------------------------------------------------
 
-    pickiness: float = _knob(
-        0.10,
+    yes_rate: float = _knob(
+        0.30,
         group=_CHOICE,
         meaning=(
-            "Share of the people on the other side that a typical person would "
-            "say yes to if introduced. Smaller means pickier: 0.10 is one in ten."
+            "Share of eligible, randomly chosen people on the other side that a "
+            "typical person would say yes to if introduced. 'Eligible' means "
+            "clearing the four hard filters; 'randomly chosen' means before any "
+            "matcher has picked well. It describes the person and the product, "
+            "not the matcher: someone shown better-than-random candidates says "
+            "yes more often than this."
         ),
-        sensible="0.02 (says yes to one in fifty) to 0.40 (says yes to most plausible people).",
+        sensible=(
+            "0.03 to 0.6. It depends on the product: a person swiping a long "
+            "feed says yes to few; a person sent a handful of considered "
+            "introductions, each with a real person waiting, says yes to many more."
+        ),
         basis=(
-            "assumption. A starting point chosen so that most introductions "
-            "are declined, as on a real app; it is not a measurement. Set it "
-            "from your own accept rates if you have them."
+            "assumption, for an introductions product: about three in ten "
+            "eligible strangers. It is not a measurement and was not derived "
+            "from any reported acceptance rate. Set it from your own data if "
+            "you have any; see the `swipe` preset for the feed case."
         ),
     )
-    pickiness_spread: float = _knob(
+    yes_rate_spread: float = _knob(
         0.50,
         group=_CHOICE,
         meaning=(
-            "How much people differ in pickiness. 0 means everyone says yes to "
-            "the same share; at 0.5 most people are within about 0.6x to 1.6x of "
+            "How much people differ in their own yes-rate. 0 means everyone has "
+            "the same; at 0.5 most people are within about 0.6x to 1.6x of "
             "typical; at 1.0 there is a long tail of people who accept almost "
             "nobody and a few who accept many."
         ),
@@ -378,8 +394,8 @@ class Scenario:
         group=_CHOICE,
         meaning=(
             "How often people on the scarce side say yes, relative to people on "
-            "the larger side. 1.0 means both sides are equally picky; 0.5 means "
-            "the scarce side accepts half as often."
+            "the larger side. 1.0 means both sides have the same yes-rate; 0.5 "
+            "means the scarce side accepts half as often."
         ),
         sensible="0.2 (the scarce side can afford to refuse nearly everyone) to 1.0.",
         basis=(
@@ -397,8 +413,9 @@ class Scenario:
             "How much people agree on who is desirable. At 0 attraction is all "
             "personal fit and everyone has a different favourite; at 1 everyone "
             "ranks the other side the same way and attention piles onto a few "
-            "people. Formally: the share of observable attraction that is a "
-            "person's general appeal rather than fit with the viewer."
+            "people. Formally: the share of non-chemistry attraction that is a "
+            "person's general appeal rather than fit with the viewer. The "
+            "matchers in this repository have no signal for general appeal."
         ),
         sensible="0.0 to 0.8.",
         basis=(
@@ -416,6 +433,33 @@ class Scenario:
             "stated preference. It sets a ceiling on any matcher."
         ),
         sensible="0.1 (people are predictable from their profiles) to 0.7 (mostly spark).",
+        basis="assumption.",
+    )
+    chemistry_mutuality: float = _knob(
+        0.50,
+        group=_CHOICE,
+        meaning=(
+            "How much of chemistry is felt by both people. At 0 each person's "
+            "spark for the other is their own and the two decisions are "
+            "unrelated beyond what profiles explain; at 1 chemistry is fully "
+            "shared, so when one says yes the other is more likely to as well. "
+            "This is what makes the two decisions in a pair not independent."
+        ),
+        sensible="0.0 to 1.0.",
+        basis=(
+            "assumption. The article notes that real decisions are correlated and gives no size."
+        ),
+    )
+    decision_noise: float = _knob(
+        0.10,
+        group=_CHOICE,
+        meaning=(
+            "Mood on the day: the share of a single yes/no decision that has "
+            "nothing to do with the other person. The same introduction on a "
+            "different day could go the other way. Unlike chemistry it is "
+            "never shared between the two people."
+        ),
+        sensible="0.0 (people are perfectly consistent) to 0.4 (snap judgements).",
         basis="assumption.",
     )
     attraction_mix: Mapping[str, float] = _knob(
@@ -542,9 +586,11 @@ class Scenario:
         group=_KNOWN,
         meaning=(
             "How well the text signal reflects how a person really comes across. "
-            "1.0 is a perfect read of their vibe; 0.0 is noise."
+            "1.0 is a perfect read of their vibe; 0.0 is noise. In a product "
+            "built on long onboarding conversations the text is a transcript, "
+            "which says far more than a written bio."
         ),
-        sensible="0.2 (one-line bios) to 0.9.",
+        sensible="0.2 (one-line bios) to 0.9 (a long conversation, well summarised).",
         basis="assumption.",
     )
     photo_signal_quality: float = _knob(
@@ -585,8 +631,8 @@ class Scenario:
         self._check_mappings()
         bounds: dict[str, tuple[float, float]] = {
             "majority_share": (0.5, 0.95),
-            "pickiness": (0.001, 1.0),
-            "pickiness_spread": (0.0, 2.0),
+            "yes_rate": (0.01, 0.95),
+            "yes_rate_spread": (0.0, 2.0),
             "minority_yes_ratio": (0.01, 2.0),
         }
         for f in fields(self):

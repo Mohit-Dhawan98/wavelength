@@ -5,10 +5,27 @@ are the ``basis`` notes on the fields themselves. Every other preset changes
 only the fields that make its world different, in the same plain-data form
 as a scenario file, and gives one reason per changed field.
 
+Each preset also says which kind of product it assumes, because that
+decides what a yes means.
+
+In an introductions product there is no feed. A person talks at length with
+the app when they join, and is then offered a small number of chosen matches
+one at a time, each with the reasons for it. They answer yes or no; two
+people are introduced only when both have said yes; an offer nobody answers
+expires after a couple of days. After a date, people come back and talk
+about how it went, which is where post-date signals come from.
+
+In a swipe feed a person judges a long stream of profiles in seconds, a yes
+costs nothing, and nobody is asked for a reason.
+
+The same person says yes far more readily to a considered introduction than
+to a profile in a feed. The article describes an introductions product, so
+that is what every preset except ``swipe`` assumes.
+
 None of these numbers was tuned to produce any particular outcome, and in
-particular none was tuned to reproduce the acceptance rates reported in the
-article. They are positions to argue with. Unless a reason names a source,
-it is an assumption.
+particular none was set by working backwards from the acceptance rates
+reported in the article. They are positions to argue with. Unless a reason
+names a source, it is an assumption.
 """
 
 from __future__ import annotations
@@ -21,16 +38,21 @@ from typing import Any, Mapping
 from wavelength.scenario import Scenario
 from wavelength.scenario_io import from_dict, read_scenario_file
 
+INTRODUCTIONS = "introductions"
+SWIPE_FEED = "swipe feed"
+
 
 @dataclass(frozen=True)
 class Preset:
     """A named world.
 
-    ``overrides`` is what differs from ``Scenario()``; ``reasons`` has one
-    entry per overridden field saying why that number was chosen.
+    ``product`` is the kind of product the world assumes. ``overrides`` is
+    what differs from ``Scenario()``; ``reasons`` has one entry per
+    overridden field saying why that number was chosen.
     """
 
     name: str
+    product: str
     summary: str
     description: str
     overrides: Mapping[str, Any]
@@ -60,15 +82,19 @@ def _archetype_shares(
 
 TODAY = Preset(
     name="today",
-    summary="A mainstream dating app resembling now.",
+    product=INTRODUCTIONS,
+    summary="Today's mix of people, on an introductions product.",
     description=(
-        "A general-purpose app in a large city. Intentions are mixed: a little "
+        "The people of a present-day general-purpose app in a large city, "
+        "using an introductions product: each person is sent a few considered "
+        "matches and asked for a yes or no. Intentions are mixed: a little "
         "over half the pool leans towards a lasting relationship and the rest "
         "are exploring or want something casual. There are somewhat more "
-        "people on one side than the other. People are moderately picky, "
-        "know themselves imperfectly, and about a third of profiles are "
-        "complete. This preset is the defaults; each field's own 'basis' note "
-        "says where its number comes from."
+        "people on one side than the other. A typical person would say yes to "
+        "about three in ten eligible strangers, knows themselves imperfectly, "
+        "and about a third of profiles are complete. This preset is the "
+        "defaults; each field's own 'basis' note says where its number comes "
+        "from."
     ),
     overrides={},
     reasons={},
@@ -76,15 +102,16 @@ TODAY = Preset(
 
 CASUAL = Preset(
     name="casual",
+    product=INTRODUCTIONS,
     summary="Most people want something casual or are exploring; few dealbreakers.",
     description=(
-        "An app people open for dates, not for a partner. Four in five are "
-        "exploring or want something casual, and because little is at stake "
-        "in one evening, few people hold firm dealbreakers and most say yes "
-        "more readily. What draws people is less about shared life plans and "
-        "more about how someone comes across and broad appeal. The market "
-        "itself (size, balance, engagement) is the same as today's, so any "
-        "difference comes from what people want."
+        "An introductions product that people use for dates, not for a "
+        "partner. Four in five are exploring or want something casual, and "
+        "because little is at stake in one evening, few people hold firm "
+        "dealbreakers and most say yes more readily. What draws people is "
+        "less about shared life plans and more about how someone comes across "
+        "and broad appeal. The market itself (size, balance, engagement) is "
+        "the same as today's, so any difference comes from what people want."
     ),
     overrides={
         "archetypes": _archetype_shares(0.05, 0.15, 0.40, 0.40),
@@ -95,7 +122,7 @@ CASUAL = Preset(
             "trust_boundaries": 0.15,
             "emotional_availability": 0.15,
         },
-        "pickiness": 0.20,
+        "yes_rate": 0.40,
         "attraction_mix": {"values": 0.30, "vibe": 0.40, "lifestyle": 0.30},
         "desirability_consensus": 0.40,
     },
@@ -108,7 +135,10 @@ CASUAL = Preset(
             "Roughly half of today's or less. Family plans falls furthest, since "
             "children matter little to a casual date. Assumption."
         ),
-        "pickiness": "Twice today's yes-rate: a date costs less than a commitment. Assumption.",
+        "yes_rate": (
+            "Four in ten eligible strangers, against three in ten today: a date "
+            "costs less than a commitment. Assumption."
+        ),
         "attraction_mix": (
             "Life plans carry less of the attraction; how someone sounds and "
             "lives carries more. Assumption."
@@ -122,14 +152,15 @@ CASUAL = Preset(
 
 SERIOUS = Preset(
     name="serious",
+    product=INTRODUCTIONS,
     summary="Marriage-minded, many firm dealbreakers, high intent.",
     description=(
-        "A matrimony-style service. Nine in ten want marriage or a lasting "
-        "relationship and most hold firm dealbreakers on timeline, commitment "
-        "and children. People are pickier because the decision is larger, but "
-        "they arrive knowing what they want, answer the questions they are "
-        "asked, and respond to introductions. The two sides are close to "
-        "balanced."
+        "A matrimony-style introductions service. Nine in ten want marriage "
+        "or a lasting relationship and most hold firm dealbreakers on "
+        "timeline, commitment and children. People say yes less readily "
+        "because the decision is larger, but they arrive knowing what they "
+        "want, answer the questions they are asked, and respond to "
+        "introductions. The two sides are close to balanced."
     ),
     overrides={
         "archetypes": _archetype_shares(0.55, 0.35, 0.08, 0.02),
@@ -140,7 +171,7 @@ SERIOUS = Preset(
             "trust_boundaries": 0.50,
             "emotional_availability": 0.40,
         },
-        "pickiness": 0.06,
+        "yes_rate": 0.20,
         "majority_share": 0.55,
         "active_share": 0.85,
         "self_knowledge": 0.65,
@@ -157,7 +188,10 @@ SERIOUS = Preset(
         "dealbreaker_shares": (
             "Most people here will not bend on timeline, commitment or children. Assumption."
         ),
-        "pickiness": "A bit over half of today's yes-rate: the stakes are higher. Assumption.",
+        "yes_rate": (
+            "Two in ten eligible strangers, against three in ten today: the "
+            "stakes are higher. Assumption."
+        ),
         "majority_share": "Closer to balanced than a mainstream app. Assumption.",
         "active_share": "People who sign up to find a spouse mostly answer. Assumption.",
         "self_knowledge": (
@@ -172,49 +206,111 @@ SERIOUS = Preset(
     },
 )
 
-DYSTOPIA = Preset(
-    name="dystopia",
-    summary="Lopsided market, attention piled onto a few, thin profiles, low honesty.",
+SWIPE = Preset(
+    name="swipe",
+    product=SWIPE_FEED,
+    summary="Today's people on a high-volume swipe feed: quick judgements, low yes-rate.",
     description=(
-        "Today's app after everything has gone wrong. Four people are seeking "
-        "for every one sought. Everyone wants the same few people, so those "
-        "few can refuse nearly everybody, and pickiness varies wildly from "
-        "person to person. Most profiles are abandoned or nearly empty, what "
-        "people say they want is a poor guide to what they respond to, and "
-        "almost nobody stays long enough for behaviour to correct it. What "
-        "people want is left exactly as in today's world, so any difference "
-        "comes from the market and the data, not from intentions."
+        "The same people as today, on a different product: a swipe feed. "
+        "Each person judges a long stream of profiles in seconds, so a "
+        "typical person says yes to about one in ten eligible strangers, "
+        "decisions are noisier, and a yes costs nothing and promises little. "
+        "Profiles are a few photos and a short form, not a conversation, so "
+        "the app knows less about what anyone wants and learns little from "
+        "reasons, because nobody is asked for one. More accounts are idle. "
+        "The strategies in this repository were designed for the other kind "
+        "of product; this preset is here to show what changes when that "
+        "assumption is dropped."
     ),
     overrides={
-        "majority_share": 0.80,
-        "minority_yes_ratio": 0.25,
-        "pickiness": 0.05,
-        "pickiness_spread": 1.00,
-        "desirability_consensus": 0.70,
-        "active_share": 0.35,
+        "yes_rate": 0.10,
+        "decision_noise": 0.25,
+        "desirability_consensus": 0.45,
+        "active_share": 0.60,
+        "feature_coverage": 0.30,
+        "full_profile_share": 0.05,
+        "dealbreakers_known_share": 0.70,
+        "onboarding_reach": 0.40,
+        "match_feedback_reach": 0.20,
+        "post_date_reach": 0.05,
+        "text_signal_quality": 0.40,
+    },
+    reasons={
+        "yes_rate": (
+            "The defining change: one in ten eligible strangers, a third of "
+            "the introductions figure. A feed "
+            "invites selectivity because there is always another profile. "
+            "Assumption."
+        ),
+        "decision_noise": "Decisions made in seconds are less consistent. Assumption.",
+        "desirability_consensus": (
+            "Photo-first judgement leans more on general appeal than on fit. Assumption."
+        ),
+        "active_share": "Four in ten accounts in a feed are idle. Assumption.",
+        "feature_coverage": (
+            "Source for the figure: the article's survey completion rate, the "
+            "nearest thing it reports to a form-based profile."
+        ),
+        "full_profile_share": "Few people complete an optional form. Assumption.",
+        "dealbreakers_known_share": (
+            "Some dealbreaker questions are optional and skipped. Assumption."
+        ),
+        "onboarding_reach": "A short signup says little about what matters. Assumption.",
+        "match_feedback_reach": (
+            "A swipe carries no stated reason, so behaviour reveals less. Assumption."
+        ),
+        "post_date_reach": "Nobody is asked how the date went. Assumption.",
+        "text_signal_quality": "Short bios say less than a conversation. Assumption.",
+    },
+)
+
+DYSTOPIA = Preset(
+    name="dystopia",
+    product=INTRODUCTIONS,
+    summary="Lopsided market, attention piled onto a few, thin profiles, low honesty.",
+    description=(
+        "Today's introductions product after everything has gone wrong. "
+        "Three people are seeking for every one sought. Most of what "
+        "attracts people is the same for everyone, so attention piles onto a "
+        "few. People on the crowded side are as willing as today's, but the "
+        "scarce side accepts far less often and yes-rates vary wildly, with "
+        "some people accepting almost nobody. Nearly half the profiles never "
+        "answer, most are nearly empty, what people say they "
+        "want is a poor guide to what they respond to, and almost nobody "
+        "stays long enough for behaviour to correct it. What people want is "
+        "left exactly as in today's world, so any difference comes from the "
+        "market and the data, not from intentions."
+    ),
+    overrides={
+        "majority_share": 0.75,
+        "minority_yes_ratio": 0.40,
+        "yes_rate_spread": 1.00,
+        "desirability_consensus": 0.60,
+        "decision_noise": 0.20,
+        "active_share": 0.55,
         "self_knowledge": 0.35,
         "onboarding_reach": 0.50,
         "match_feedback_reach": 0.15,
         "post_date_reach": 0.03,
         "feature_coverage": 0.30,
         "full_profile_share": 0.05,
-        "dealbreakers_known_share": 0.60,
+        "dealbreakers_known_share": 0.75,
         "extraction_accuracy": 0.75,
         "text_signal_quality": 0.30,
         "photo_signal_quality": 0.30,
     },
     reasons={
-        "majority_share": "Four seeking for every one sought. Assumption.",
+        "majority_share": "Three seeking for every one sought. Assumption.",
         "minority_yes_ratio": (
-            "The scarce side accepts a quarter as often as the crowded side. Assumption."
+            "The scarce side accepts well under half as often as the crowded side. Assumption."
         ),
-        "pickiness": "Half of today's yes-rate even on the crowded side. Assumption.",
-        "pickiness_spread": "A long tail: some accept almost nobody. Assumption.",
+        "yes_rate_spread": "A long tail: some accept almost nobody. Assumption.",
         "desirability_consensus": (
-            "Most of attraction is general appeal, so attention concentrates on "
-            "a small share of people. Assumption."
+            "Most of what can be explained about attraction is general appeal, "
+            "so attention concentrates on a small share of people. Assumption."
         ),
-        "active_share": "Two in three profiles never answer. Assumption.",
+        "decision_noise": "Tired, distrustful users decide less consistently. Assumption.",
+        "active_share": "Nearly half the profiles never answer. Assumption.",
         "self_knowledge": (
             "Barely better than guessing among three levels: stated preferences "
             "are aspirational or performed. Assumption."
@@ -227,7 +323,7 @@ DYSTOPIA = Preset(
             "here as what a thin, form-based profile looks like."
         ),
         "full_profile_share": "Complete profiles are rare. Assumption.",
-        "dealbreakers_known_share": "Four in ten never answer all four questions. Assumption.",
+        "dealbreakers_known_share": "One in four never answers all four questions. Assumption.",
         "extraction_accuracy": "Sparse text is misread more often. Assumption.",
         "text_signal_quality": "One-line bios say little. Assumption.",
         "photo_signal_quality": "Few, heavily curated photos say little. Assumption.",
@@ -236,7 +332,7 @@ DYSTOPIA = Preset(
 
 #: All presets by name, in the order they are listed.
 PRESETS: Mapping[str, Preset] = MappingProxyType(
-    {preset.name: preset for preset in (TODAY, CASUAL, SERIOUS, DYSTOPIA)}
+    {preset.name: preset for preset in (TODAY, CASUAL, SERIOUS, SWIPE, DYSTOPIA)}
 )
 
 

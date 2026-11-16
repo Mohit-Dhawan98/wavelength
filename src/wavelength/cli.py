@@ -3,6 +3,7 @@
 ``wavelength scenarios``            list the preset worlds
 ``wavelength describe <scenario>``  every field, its value and its meaning
 ``wavelength simulate``             run the three strategies in one or more worlds
+``wavelength simulate --calibrate`` also fit P(accept) by rank and check it held out
 
 A scenario is a preset name or the path of a ``.toml`` / ``.json`` scenario
 file. ``--set key=value`` then overrides single fields.
@@ -30,7 +31,7 @@ def _add_scenario_options(parser: argparse.ArgumentParser) -> None:
         default=[],
         metavar="KEY=VALUE",
         help=(
-            "override one field, e.g. --set pickiness=0.08 or "
+            "override one field, e.g. --set yes_rate=0.2 or "
             "--set archetypes.casual.share=0.5 (repeatable; setting one share of a "
             "distribution rescales the others)"
         ),
@@ -83,12 +84,20 @@ def _build_parser() -> argparse.ArgumentParser:
         "--top-n", type=int, default=TOP_N, help=f"mutual top-N cutoff (default: {TOP_N})"
     )
     simulate.add_argument(
+        "--calibrate",
+        action="store_true",
+        help=(
+            "fit P(accept) by rank on separate pools, then report strategy 3 with both "
+            "the article's curve and the fitted one on held-out pools"
+        ),
+    )
+    simulate.add_argument(
         "--compare",
         default="",
         metavar="A,B,...",
         help=(
             "also run these scenarios and print them side by side; --set, --users, "
-            "--seed and --trials apply to every scenario"
+            "--seed, --trials and --calibrate apply to every scenario"
         ),
     )
     return parser
@@ -121,6 +130,7 @@ def _simulate(args: argparse.Namespace) -> str:
                 top_n=args.top_n,
                 users=args.users,
                 name=name,
+                calibrate=args.calibrate,
             )
         )
     return format_report(reports[0]) if len(reports) == 1 else format_comparison(reports)

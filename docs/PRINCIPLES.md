@@ -1,6 +1,6 @@
 # How matching should work
 
-Nine principles behind this implementation. The substance comes from
+Ten principles behind this implementation. The substance comes from
 [the article](https://themlnerd.substack.com/p/why-the-girl-you-want-doesnt-want);
 each principle points at the function that embodies it.
 
@@ -121,3 +121,26 @@ of the stated world, not as evidence about the real one.
 Code: `scenario.Scenario`, whose fields carry their meaning, sensible range
 and basis; `presets.PRESETS`; and `decisions.decide`, the hidden rule for
 who says yes.
+
+## 10. A probability curve belongs to one world: fit it there, check it elsewhere
+
+"People accept their first choice almost always and their tenth half the
+time" is not a fact about people. It is a fact, if it is one, about a
+particular product, population and matcher. A product that sends a few
+considered introductions and a feed that shows hundreds of profiles will
+have different curves; so will a good score and a poor one, because rank 1
+by a poor score is not much of a first choice. A hand-set curve carried
+into a new setting is a guess.
+
+So the curve is an argument, not a constant. Fit it from decisions that
+were actually observed, keep the fit simple enough to read (one number per
+rank, never rising as rank gets worse), and judge it only on data it was
+not fitted on. Then check the other assumption separately: the product
+`P(A) x P(B)` can be wrong even when each person's curve is right, if the
+two decisions move together. Comparing the observed both-yes rate with the
+product of the two observed yes-rates shows which of the two is at fault.
+
+Code: the `curve` argument of `matching.mutual_top_n`,
+`matching.assign_by_probability` and `matching.bidirectional_match`;
+`calibration.fit_rank_curve`; and `simulate.run_simulation(calibrate=True)`,
+which fits on one set of pools and reports on another.
