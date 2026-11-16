@@ -169,6 +169,7 @@ def scorecard(
                 "b_yes": i.b_yes,
                 "stage": i.stage,
                 "known_ok": i.known_ok,
+                "fated_stage": arena.fated_stage(i.a, i.b),
             }
             for i in made
             if i.a in followed or i.b in followed

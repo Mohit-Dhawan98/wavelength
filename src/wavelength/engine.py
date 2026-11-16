@@ -188,6 +188,13 @@ class Arena:
             self._possible = (reaches | reaches.T).sum(axis=1).astype(int)
         return self._possible
 
+    def fated_stage(self, a: int, b: int) -> int:
+        """How far the answer key says a pair would get if both answered: 0 to 4.
+
+        This is hidden truth. It is for the scorecard after a run, never for a rule.
+        """
+        return int(self._world.key.stage[a, b])
+
     def describe_person(self, person: int) -> dict[str, object]:
         """What the app shows about one person: nothing hidden."""
         obs = self._observations

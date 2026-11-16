@@ -528,12 +528,28 @@ def test_scorecard_is_plain_json_with_the_promised_parts():
     assert card["events"] and all(e["a"] in followed or e["b"] in followed for e in card["events"])
     assert all(0 <= e["stage"] <= 4 and 1 <= e["round"] <= 5 for e in card["events"])
     assert all(isinstance(e["known_ok"], bool) for e in card["events"])
+    # the answer key's verdict on each introduced pair is revealed after the run
+    assert all(0 <= e["fated_stage"] <= 4 for e in card["events"])
+    assert all(e["stage"] == e["fated_stage"] for e in card["events"] if e["a_yes"] and e["b_yes"])
+    assert all(e["stage"] == 0 for e in card["events"] if not (e["a_yes"] and e["b_yes"]))
+    assert any(e["fated_stage"] > e["stage"] for e in card["events"])  # a chance lost to silence
     assert sum(not e["known_ok"] for e in card["events"]) == made["known_dealbreaker_violations"]
     # nobody is introduced after the week they left, and couples leave together
     left = {int(p): week for p, week in card["fates"]["left_as_couple"].items()}
     for e in card["events"]:
         for person in (e["a"], e["b"]):
             assert person not in left or e["round"] <= left[person]
+
+
+def test_the_fated_stage_is_the_answer_keys_and_no_rule_can_reach_it():
+    arena = Arena(dataclasses.replace(PRESETS["today"].scenario, pool_size=120), seed=3)
+    a = int(np.flatnonzero(arena._board.larger_side)[0])
+    b = int(np.flatnonzero(~arena._board.larger_side)[0])
+    assert arena.fated_stage(a, b) == arena.fated_stage(b, a) == int(arena._world.key.stage[a, b])
+    assert arena.fated_stage(a, a) == 0
+    seen = []
+    arena.play(lambda v: seen.append(v) or [], rounds=1)
+    assert not any(hasattr(seen[0], name) for name in ("fated_stage", "key", "_world", "stage"))
 
 
 def test_run_accepts_a_preset_a_scenario_or_a_plain_function():
