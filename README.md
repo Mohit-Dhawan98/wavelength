@@ -9,6 +9,10 @@ This repository is a small reference implementation of the ideas in
 switching from "best match" to "mutual match"](https://themlnerd.substack.com/p/why-the-girl-you-want-doesnt-want)
 by Mohit Dhawan (2026-02-01).
 
+**Play it in your browser:** https://mohit-dhawan98.github.io/wavelength/ — design a world, write a
+matching rule in a few lines, and see how many couples it finds out of the most that were possible.
+The page runs this package in your browser; nothing is sent to a server.
+
 ## What this is and is not
 
 - It is a clean-room reference implementation, written to make the article's

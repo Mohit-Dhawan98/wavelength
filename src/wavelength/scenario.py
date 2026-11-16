@@ -285,8 +285,7 @@ class Scenario:
         ),
         basis=(
             "assumption. Large enough that a typical person has several dozen "
-            "eligible candidates, small enough that a run takes seconds. The "
-            "article's app had 100K+ users across many such pools."
+            "eligible candidates, small enough that a run takes seconds."
         ),
     )
     majority_share: float = _knob(

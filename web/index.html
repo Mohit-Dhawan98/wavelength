@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Wavelength play</title>
+<meta name="description" content="Design a dating world, write a matching rule in a few lines, and see how many couples it finds out of the most that were possible.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='5' fill='%23ff5904'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400..600&family=Instrument+Sans:wght@400;500;600&family=Fragment+Mono&display=swap">
+<link rel="stylesheet" href="play.css">
+</head>
+<body>
+<svg id="pat-defs" aria-hidden="true"><defs>
+<pattern id="st-hot" width="3" height="10" patternUnits="userSpaceOnUse"><rect width="2" height="10" fill="#ff5904"/></pattern>
+<pattern id="st-grey" width="3" height="10" patternUnits="userSpaceOnUse"><rect width="2" height="10" fill="#8a8a86"/></pattern>
+<pattern id="st-dim" width="3" height="10" patternUnits="userSpaceOnUse"><rect width="2" height="10" fill="#3a3a3a"/></pattern>
+</defs></svg>
+
+<header class="top">
+  <span class="tab"><span class="tab-dot" aria-hidden="true"></span>wavelength.play</span>
+  <nav class="top-nav">
+    <a href="https://themlnerd.substack.com/p/why-the-girl-you-want-doesnt-want" target="_blank" rel="noopener">the article</a>
+    <a href="https://github.com/Mohit-Dhawan98/wavelength" target="_blank" rel="noopener">source</a>
+    <a href="https://github.com/Mohit-Dhawan98/wavelength/tree/main/rules" target="_blank" rel="noopener">submit a rule</a>
+  </nav>
+</header>
+
+<main class="wrap">
+  <section class="lead">
+    <h1>Design a dating world. Write a matching rule. Count the couples.</h1>
+    <p>Every world here has a hidden answer key: the pairs who would say yes, keep talking, meet, and want to meet again. Your rule never sees it. It sees what an app would see, proposes introductions for eight weeks, and is scored on how many of those couples it found out of the most anyone could have.</p>
+  </section>
+
+  <div class="boot" id="boot" role="status"><span class="boot-bar" aria-hidden="true"></span><span id="boot-text">Starting Python in your browser</span></div>
+
+  <div class="grid" id="app" hidden>
+    <aside class="col-world">
+      <section class="card">
+        <h2>The world</h2>
+        <div class="chips" id="presets" role="group" aria-label="start from a world"></div>
+        <p class="hint" id="preset-desc"></p>
+        <div id="main-knobs"></div>
+        <div class="row3">
+          <label>people<input type="number" id="people" min="100" max="1200" step="50" value="400"></label>
+          <label>weeks<input type="number" id="rounds" min="2" max="16" step="1" value="8"></label>
+          <label>seed<input type="number" id="seed" min="0" max="99999" step="1" value="0"></label>
+        </div>
+        <details id="all-knobs"><summary>Every setting</summary><div id="groups"></div></details>
+        <p class="explain" id="explain" aria-live="polite">Hover or focus a setting to see what it means and where its default comes from.</p>
+      </section>
+    </aside>
+
+    <div class="col-main">
+      <section class="card rule">
+        <div class="rule-head">
+          <h2>Your rule</h2>
+          <div class="chips" id="rules" role="group" aria-label="start from a rule"></div>
+        </div>
+        <textarea id="code" spellcheck="false" aria-label="rule source in Python"></textarea>
+        <p class="err" id="err" hidden></p>
+        <div class="rule-foot">
+          <button type="button" class="btn solid" id="run">Run the eight weeks</button>
+          <button type="button" class="btn" id="compare">Run every demo rule</button>
+          <button type="button" class="btn" id="share">Copy a link to this world and rule</button>
+          <span class="took" id="took"></span>
+        </div>
+      </section>
+
+      <figure class="fig" id="stage-fig">
+        <div class="fig-in">
+          <div class="phead"><span class="lab">Introductions, week by week · <b id="stage-rule">rule</b></span><span id="stage-count">week 1 of 8</span></div>
+          <div class="stepline"><span class="n" id="stage-n">WEEK 1</span><span><span id="stage-text"></span><span class="caret" aria-hidden="true"></span></span></div>
+          <div class="svgw"><svg class="fx" id="stage" viewBox="0 0 720 380" role="img" aria-label="A sample of the people in the world. Lines are introductions; their colour shows how far each pair got."></svg></div>
+          <div class="legend">
+            <span><i class="lg dot-a"></i>larger side</span><span><i class="lg dot-b"></i>scarce side</span>
+            <span><i class="lg ln-exp"></i>not answered</span><span><i class="lg ln-one"></i>a no, or only one yes</span>
+            <span><i class="lg ln-yes"></i>both said yes</span><span><i class="lg ln-hit"></i>want to meet again</span>
+          </div>
+          <div class="ctl-row">
+            <span class="sample" id="sample-note"></span>
+            <div class="ctls">
+              <button type="button" class="ctl" id="prev" aria-label="previous week"><svg viewBox="0 0 12 12"><path d="M8.5 1.5v9L2.5 6z"/></svg></button>
+              <button type="button" class="ctl" id="pause" aria-label="pause or play"><svg viewBox="0 0 12 12"><path d="M2.5 1.5h2.5v9H2.5zM7 1.5h2.5v9H7z"/></svg></button>
+              <button type="button" class="ctl" id="next" aria-label="next week"><svg viewBox="0 0 12 12"><path d="M3.5 1.5v9l6-4.5z"/></svg></button>
+            </div>
+          </div>
+        </div>
+      </figure>
+
+      <figure class="fig" id="score-fig">
+        <div class="fig-in">
+          <div class="phead"><span class="lab">Couples found · <b>out of the most that were possible</b></span><span id="score-big">–</span></div>
+          <div class="svgw"><svg class="fx" id="score" viewBox="0 0 720 196" role="img" aria-label="Bars for the four stages a couple can reach, comparing this rule with a perfect profile reader and with the most possible."></svg></div>
+          <div class="legend">
+            <span><svg width="14" height="10"><rect width="14" height="10" fill="url(#st-hot)"/></svg>this rule</span>
+            <span><svg width="14" height="10"><rect width="14" height="10" fill="url(#st-grey)"/></svg>a rule that reads every profile perfectly</span>
+            <span><svg width="14" height="10"><rect width="14" height="10" fill="url(#st-dim)"/></svg>the most possible in this world</span>
+          </div>
+          <dl class="facts" id="facts"></dl>
+        </div>
+        <figcaption>The full bar is every couple the answer key says could have formed at that stage. A rule cannot see chemistry or mood, so even a perfect reader of profiles falls short of it.</figcaption>
+      </figure>
+
+      <section class="card" id="board-card" hidden>
+        <h2>Leaderboard for this world</h2>
+        <ol class="board" id="board"></ol>
+      </section>
+    </div>
+  </div>
+
+  <footer class="end"><span>A simulation shows what follows from its assumptions. It cannot show the assumptions are true.</span><span>Runs entirely in your browser</span></footer>
+</main>
+
+<script type="module" src="play.js"></script>
+</body>
+</html>

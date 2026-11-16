@@ -4,3 +4,7 @@ __pycache__/
 .pytest_cache/
 dist/
 *.egg-info/
+
+# built for the playground
+web/wheel/
+web/shots/
