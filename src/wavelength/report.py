@@ -290,3 +290,59 @@ def format_comparison(reports: Sequence[SimulationReport]) -> str:
         lines += ["", *_table([f"P(mutual) from {calibration.name}", *names], rows)]
     lines += ["", *_LEGEND, *_CALIBRATION_LEGEND]
     return "\n".join(lines)
+
+
+def format_scorecard(card: Mapping[str, Any]) -> str:
+    """One rule's scorecard from ``play.run``, as text."""
+    stage_rows = [
+        [
+            f"{s['stage']} {s['meaning']}",
+            str(s["couples"]),
+            str(s["best_possible"]),
+            f"{s['share_of_best']:.1%}",
+            f"{s['informed_share_of_best']:.1%}",
+        ]
+        for s in card["stages"]
+    ]
+    made, people = card["introductions"], card["people_outcomes"]
+    round_rows = [
+        [
+            str(r["round"]),
+            str(r["introductions"]),
+            str(r["answered"]),
+            str(r["both_said_yes"]),
+            str(r["hit_it_off"]),
+            str(r["gave_up"]),
+        ]
+        for r in card["per_round"]
+    ]
+    return "\n".join(
+        [
+            f'Rule "{card["rule"]}" in world "{card["world"]}"',
+            _CAVEAT,
+            f"seed={card['seed']}  people={card['people']}  rounds={card['rounds']}",
+            "",
+            f"Score: {card['score']:.1%} of the couples that were possible.",
+            "",
+            *_table(
+                ["how far couples got", "couples", "best possible", "share", "perfect profiles"],
+                stage_rows,
+            ),
+            "",
+            "best possible: the most couples anyone could have formed, from the answer key.",
+            "perfect profiles: reached by reading profiles perfectly, blind to chemistry and luck.",
+            "    A rule far below it is limited by what it does with the information; the gap from",
+            "    there to 100% is chemistry, luck and time, which no rule can see.",
+            "",
+            f"introductions: {made['made']} made, {made['answered']} answered by both, "
+            f"{made['expired']} expired, {made['one_sided']} one-sided, "
+            f"{made['known_dealbreaker_violations']} against a known dealbreaker",
+            f"people: {people['hit_it_off']} hit it off, {people['gave_up']} gave up, "
+            f"{people['never_introduced']} never introduced",
+            "",
+            *_table(
+                ["week", "introductions", "answered", "both yes", "hit it off", "gave up"],
+                round_rows,
+            ),
+        ]
+    )

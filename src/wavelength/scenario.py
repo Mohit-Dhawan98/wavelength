@@ -608,7 +608,7 @@ class Scenario:
         basis="assumption.",
     )
     fatigue: float = _knob(
-        0.15,
+        0.10,
         group=_ATTENTION,
         meaning=(
             "Share of a person's willingness to open the app that is lost with "
@@ -620,7 +620,7 @@ class Scenario:
         basis="assumption.",
     )
     patience: float = _knob(
-        6.0,
+        8.0,
         low=1.0,
         high=50.0,
         group=_ATTENTION,

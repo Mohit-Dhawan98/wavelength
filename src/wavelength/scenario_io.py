@@ -188,17 +188,26 @@ def _set_path(data: dict[str, Any], key: str, value: Any) -> None:
     node[leaf] = value
 
 
-def with_overrides(scenario: Scenario, assignments: Sequence[str]) -> Scenario:
-    """Apply ``key=value`` overrides, as given to ``--set``, in order.
+def with_values(scenario: Scenario, values: Mapping[str, Any]) -> Scenario:
+    """Apply ``{dotted key: value}`` overrides, in order.
 
     Keys are dotted paths into the plain-data form: ``yes_rate``,
     ``dealbreaker_shares.family_plans``, ``archetypes.casual.share``,
-    ``archetypes.casual.relationship_timeline.casual``.
+    ``archetypes.casual.relationship_timeline.casual``. Setting one share
+    of a distribution rescales its siblings.
     """
     data = to_dict(scenario)
+    for key, value in values.items():
+        _set_path(data, str(key).strip(), value)
+    return from_dict(data, base=scenario)
+
+
+def with_overrides(scenario: Scenario, assignments: Sequence[str]) -> Scenario:
+    """Apply ``key=value`` overrides, as given to ``--set``, in order."""
+    values: dict[str, Any] = {}
     for assignment in assignments:
         key, separator, text = assignment.partition("=")
         if not separator or not key.strip():
             raise ValueError(f"--set expects key=value, got {assignment!r}")
-        _set_path(data, key.strip(), _parse_value(text.strip()))
-    return from_dict(data, base=scenario)
+        values[key.strip()] = _parse_value(text.strip())
+    return with_values(scenario, values)

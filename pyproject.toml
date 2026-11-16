@@ -22,5 +22,10 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/wavelength"]
 
+# The demo rules live at the repository root so they are easy to find and to
+# add to; installed copies of the package carry them as wavelength/_rules.
+[tool.hatch.build.targets.wheel.force-include]
+"rules" = "wavelength/_rules"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

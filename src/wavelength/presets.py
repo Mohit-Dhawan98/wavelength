@@ -57,6 +57,7 @@ class Preset:
     description: str
     overrides: Mapping[str, Any]
     reasons: Mapping[str, str]
+    base: Scenario | None = None  # what the overrides are applied to; None means the defaults
 
     def __post_init__(self) -> None:
         if set(self.overrides) != set(self.reasons):
@@ -64,8 +65,8 @@ class Preset:
 
     @property
     def scenario(self) -> Scenario:
-        """The full scenario: the defaults with this preset's overrides applied."""
-        return from_dict(self.overrides)
+        """The full scenario: the base with this preset's overrides applied."""
+        return from_dict(self.overrides, base=self.base)
 
 
 def _archetype_shares(
@@ -243,7 +244,7 @@ SWIPE = Preset(
         "decision_noise": 0.25,
         "desirability_consensus": 0.45,
         "open_rate": 0.60,
-        "fatigue": 0.20,
+        "fatigue": 0.15,
         "intent_openness": 0.70,
         "voice_signal_quality": 0.0,
         "family_visibility": 0.0,
@@ -310,13 +311,13 @@ DYSTOPIA = Preset(
     ),
     overrides={
         "majority_share": 0.75,
-        "minority_yes_ratio": 0.40,
+        "minority_yes_ratio": 0.50,
         "yes_rate_spread": 1.00,
         "desirability_consensus": 0.60,
         "decision_noise": 0.20,
         "open_rate": 0.55,
-        "fatigue": 0.30,
-        "patience": 3.0,
+        "fatigue": 0.20,
+        "patience": 4.0,
         "intent_openness": 0.60,
         "self_knowledge": 0.35,
         "onboarding_reach": 0.50,
@@ -332,7 +333,7 @@ DYSTOPIA = Preset(
     reasons={
         "majority_share": "Three seeking for every one sought. Assumption.",
         "minority_yes_ratio": (
-            "The scarce side accepts well under half as often as the crowded side. Assumption."
+            "The scarce side accepts half as often as the crowded side. Assumption."
         ),
         "yes_rate_spread": "A long tail: some accept almost nobody. Assumption.",
         "desirability_consensus": (
@@ -342,7 +343,7 @@ DYSTOPIA = Preset(
         "decision_noise": "Tired, distrustful users decide less consistently. Assumption.",
         "open_rate": "A typical person opens the app barely one week in two. Assumption.",
         "fatigue": "Each letdown costs twice the willingness it does today. Assumption.",
-        "patience": "People give up after about three letdowns, not six. Assumption.",
+        "patience": "People give up after about four letdowns, not eight. Assumption.",
         "intent_openness": "Four in ten say what they think will be accepted. Assumption.",
         "self_knowledge": (
             "Barely better than guessing among three levels: stated preferences "
@@ -381,11 +382,82 @@ def load_scenario_file(path: str | Path) -> Scenario:
     """Load a TOML or JSON scenario file.
 
     The optional top-level key ``base`` names the preset to start from
-    (default ``today``); every other key overrides one field of it.
+    (default ``today``); every other key overrides one field of it. A file
+    with a ``fields`` table is a preset file; see ``load_preset_file``.
     """
     data = dict(read_scenario_file(path))
+    if "fields" in data:
+        return load_preset_file(path).scenario
     base = preset(str(data.pop("base", "today"))).scenario
     return from_dict(data, base=base)
+
+
+_PRESET_FILE_KEYS = {"name", "product", "summary", "description", "base", "fields"}
+
+
+def load_preset_file(path: str | Path) -> Preset:
+    """Load a preset whose every number carries its own citation.
+
+    This is the format for worlds built from sourced figures, such as a
+    particular country. Each changed field gives a ``value`` and a ``basis``
+    saying where the value comes from; a field without a basis is refused::
+
+        name = "somewhere"
+        product = "introductions"
+        summary = "One line."
+        description = "A paragraph."
+        base = "today"
+
+        [fields.endogamy_share]
+        value = 0.4
+        basis = "Source: author, title, year, table, URL."
+
+        [fields.community_shares]
+        value = { first = 0.8, second = 0.2 }
+        basis = "Source: ..."
+
+    No such file ships with this repository.
+    """
+    path = Path(path)
+    data = dict(read_scenario_file(path))
+    unknown = sorted(set(data) - _PRESET_FILE_KEYS)
+    if unknown:
+        raise ValueError(
+            f"{path}: unknown key(s) {unknown}; a preset file has {sorted(_PRESET_FILE_KEYS)}"
+        )
+    fields = data.get("fields", {})
+    if not isinstance(fields, Mapping):
+        raise ValueError(f"{path}: 'fields' must be a table of field name to value and basis")
+    overrides: dict[str, Any] = {}
+    reasons: dict[str, str] = {}
+    for name, entry in fields.items():
+        if not isinstance(entry, Mapping) or set(entry) != {"value", "basis"}:
+            raise ValueError(f"{path}: fields.{name} needs exactly 'value' and 'basis'")
+        basis = str(entry["basis"]).strip()
+        if not basis:
+            raise ValueError(f"{path}: fields.{name} has no basis; say where the value comes from")
+        overrides[name], reasons[name] = entry["value"], basis
+    loaded = Preset(
+        name=str(data.get("name", path.stem)),
+        product=str(data.get("product", INTRODUCTIONS)),
+        summary=str(data.get("summary", "")),
+        description=str(data.get("description", "")),
+        overrides=overrides,
+        reasons=reasons,
+        base=preset(str(data.get("base", "today"))).scenario,
+    )
+    loaded.scenario  # build it now, so a bad value is reported when the file is loaded
+    return loaded
+
+
+def load_preset_directory(directory: str | Path) -> dict[str, Preset]:
+    """Every preset file (``.toml`` or ``.json``) in a directory, by preset name."""
+    found: dict[str, Preset] = {}
+    for path in sorted(Path(directory).iterdir()):
+        if path.suffix in (".toml", ".json"):
+            loaded = load_preset_file(path)
+            found[loaded.name] = loaded
+    return found
 
 
 def resolve_scenario(name_or_path: str) -> tuple[str, Scenario]:

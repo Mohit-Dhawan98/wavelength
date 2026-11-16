@@ -4,6 +4,8 @@
 ``wavelength describe <scenario>``  every field, its value and its meaning
 ``wavelength simulate``             run the three strategies in one or more worlds
 ``wavelength simulate --calibrate`` also fit P(accept) by rank and check it held out
+``wavelength play <rule file>``     score one rule against a world's hidden answer key
+``wavelength tournament <dir>``     score every rule in a directory across worlds and seeds
 
 A scenario is a preset name or the path of a ``.toml`` / ``.json`` scenario
 file. ``--set key=value`` then overrides single fields.
@@ -12,15 +14,27 @@ file. ``--set key=value`` then overrides single fields.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
+from pathlib import Path
 from typing import Sequence
 
+from wavelength.engine import DEFAULT_ROUNDS
 from wavelength.matching import TOP_N
+from wavelength.play import DEFAULT_PEOPLE, load_rules, run
 from wavelength.presets import PRESETS, resolve_scenario
-from wavelength.report import format_comparison, format_presets, format_report, format_scenario
+from wavelength.report import (
+    format_comparison,
+    format_presets,
+    format_report,
+    format_scenario,
+    format_scorecard,
+)
 from wavelength.scenario import Scenario
 from wavelength.scenario_io import with_overrides
 from wavelength.simulate import DEFAULT_TRIALS, run_simulation
+from wavelength.tournament import format_leaderboard, rules_from, run_tournament
+from wavelength.view import RuleError
 
 
 def _add_scenario_options(parser: argparse.ArgumentParser) -> None:
@@ -100,7 +114,71 @@ def _build_parser() -> argparse.ArgumentParser:
             "--seed, --trials and --calibrate apply to every scenario"
         ),
     )
+    play = commands.add_parser(
+        "play",
+        help="score one rule file against a world's hidden answer key",
+        description=(
+            "Play a rule for several rounds in a seeded world and print its scorecard: "
+            "couples formed at each stage as a share of the most that were possible."
+        ),
+    )
+    play.add_argument("rule", help="a rule file, e.g. rules/article.py")
+    play.add_argument("--world", default="today", help="preset or scenario file (default: today)")
+    _add_scenario_options(play)
+    _add_game_options(play)
+    play.add_argument("--seed", type=int, default=0, help="random seed (default: 0)")
+    play.add_argument("--json", action="store_true", help="print the full scorecard as JSON")
+
+    tournament = commands.add_parser(
+        "tournament",
+        help="score every rule in a directory across worlds and seeds",
+        description=(
+            "Every rule plays every world for several seeds. Within a world and seed all "
+            "rules face the same people, the same answer key and the same luck."
+        ),
+    )
+    tournament.add_argument("rules", help="a directory of rule files, or one rule file")
+    tournament.add_argument(
+        "--worlds",
+        default=",".join(PRESETS),
+        help=f"comma-separated presets or scenario files (default: {','.join(PRESETS)})",
+    )
+    tournament.add_argument("--seeds", type=int, default=5, help="seeds per world (default: 5)")
+    _add_game_options(tournament)
+    tournament.add_argument("--out", default=None, help="also write the leaderboard here as JSON")
     return parser
+
+
+def _add_game_options(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--people", type=int, default=DEFAULT_PEOPLE, help=f"pool size (default: {DEFAULT_PEOPLE})"
+    )
+    parser.add_argument(
+        "--rounds", type=int, default=DEFAULT_ROUNDS, help=f"weeks (default: {DEFAULT_ROUNDS})"
+    )
+
+
+def _play(args: argparse.Namespace) -> str:
+    _, scenario = _resolve(args.world, args.overrides)
+    cards = [
+        run(found, scenario, seed=args.seed, people=args.people, rounds=args.rounds)
+        for found in load_rules(args.rule)
+    ]
+    for card in cards:
+        card["world"] = args.world if not args.overrides else f"{args.world} (modified)"
+    if args.json:
+        return json.dumps(cards[0] if len(cards) == 1 else cards, indent=2)
+    return "\n\n".join(format_scorecard(card) for card in cards)
+
+
+def _tournament(args: argparse.Namespace) -> str:
+    worlds = [w.strip() for w in args.worlds.split(",") if w.strip()]
+    result = run_tournament(
+        rules_from(args.rules), worlds, seeds=args.seeds, people=args.people, rounds=args.rounds
+    )
+    if args.out:
+        Path(args.out).write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+    return format_leaderboard(result)
 
 
 def _resolve(name_or_path: str, overrides: Sequence[str]) -> tuple[str, Scenario]:
@@ -143,9 +221,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             output = format_presets()
         elif args.command == "describe":
             output = _describe(args)
+        elif args.command == "play":
+            output = _play(args)
+        elif args.command == "tournament":
+            output = _tournament(args)
         else:
             output = _simulate(args)
-    except ValueError as error:
+    except (ValueError, RuleError, OSError) as error:
         print(f"wavelength: {error}", file=sys.stderr)
         return 2
     print(output)
