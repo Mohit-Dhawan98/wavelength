@@ -356,12 +356,9 @@ class Scenario:
         ),
         sensible="0.02 (says yes to one in fifty) to 0.40 (says yes to most plausible people).",
         basis=(
-            "assumption. It is of the same order as the share of browsed "
-            "profiles that users went on to contact in the online-dating data "
-            "of Hitsch, Hortacsu and Ariely (2010), cited in the article, which "
-            "was roughly one in ten. Answering an introduction is not the same "
-            "act as sending a first message, so this is a starting point, not "
-            "a measurement."
+            "assumption. A starting point chosen so that most introductions "
+            "are declined, as on a real app; it is not a measurement. Set it "
+            "from your own accept rates if you have them."
         ),
     )
     pickiness_spread: float = _knob(

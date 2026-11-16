@@ -140,11 +140,10 @@ range and the basis of its default; `wavelength describe` prints all three.
 Where the defaults come from. Two are figures the article reports about its
 own app: `feature_coverage` (85% coverage from conversational extraction;
 the article gives 30% for surveys, which is a useful alternative setting)
-and `full_profile_share` (about 34% of users with full extraction). Three
+and `full_profile_share` (about 34% of users with full extraction). Two
 lean on Hitsch, Hortacsu and Ariely (2010), cited by the article, for
-direction or order of magnitude only: `pickiness`, `minority_yes_ratio` and
-`desirability_consensus`. Every other default is an assumption and is
-labelled as one in the code.
+direction only: `minority_yes_ratio` and `desirability_consensus`. Every
+other default is an assumption and is labelled as one in the code.
 
 ### Presets
 
