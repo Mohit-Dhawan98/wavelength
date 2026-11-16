@@ -513,6 +513,12 @@ def test_scorecard_is_plain_json_with_the_promised_parts():
         == sum(r["introductions"] for r in card["per_round"])
     )
     assert made["wasted"] <= made["made"] and made["known_dealbreaker_violations"] == 0
+    funnel = [step["count"] for step in made["funnel"]]
+    assert len(funnel) == 6 and funnel == sorted(funnel, reverse=True)
+    assert funnel[:3] == [made["made"], made["answered"], made["made"] - made["wasted"]]
+    assert [step["step"] for step in made["funnel"]][2:] == [s["meaning"] for s in card["stages"]]
+    for key, column in (("both_said_yes", 2), ("kept_talking", 3), ("met", 4), ("hit_it_off", 5)):
+        assert sum(r[key] for r in card["per_round"]) == funnel[column]
     assert len(card["per_round"]) == 5 and [r["round"] for r in card["per_round"]] == [
         1,
         2,

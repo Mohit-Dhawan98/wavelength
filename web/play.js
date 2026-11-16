@@ -596,14 +596,14 @@ function renderAll() {
     <td class="plotcell"><div class="plot">${refs}<i class="range" style="left:${x(st.min)};width:${x(st.max - st.min)}"></i><i class="dot" style="left:${x(st.mean)}"></i></div></td>
     <td class="n strong">${pct(st.mean)}</td><td class="n">${st.n > 1 ? pct(st.min) + " to " + pct(st.max) : "one seed"}</td><td class="n">${now && !now.error ? now.couples + " of " + now.possible : ""}</td></tr>`;
   $("p-all").innerHTML = `<p class="lead-line">Every strategy in the same world. Each is played with ${big ? "one seed" : SEEDS + " seeds"}, because the same rule in the same world can move by several points on luck alone.${left ? ` <span class="pending">${left} more ${left === 1 ? "run" : "runs"} to go</span>` : ""}</p>
-    <div class="tablew"><table class="alltab"><thead><tr><th>Strategy, sorted by mean share of the possible couples found</th>
+    <div class="tablew"><table class="alltab"><thead><tr><th>Strategy, sorted by mean</th>
       <th class="plothead"><div class="plot axis">${bench != null ? `<span class="reflab" style="left:${x(bench)}">perfect reader of profiles</span>` : ""}${floor != null ? `<span class="reflab low" style="left:${x(floor)}">random</span>` : ""}</div>
         <div class="plot ticks"><span style="left:0">0</span><span class="minor" style="left:25%">25%</span><span style="left:50%">50%</span><span class="minor" style="left:75%">75%</span><span style="left:100%">100%</span></div></th>
       <th class="n">Mean</th><th class="n">Worst to best seed</th><th class="n">Seed ${state.size.seed}</th></tr></thead><tbody>
     ${ran.map(tr).join("")}
     ${rest.map(({ s, bad }) => `<tr class="unrun"><td>${esc(s.name)}${s.mine ? ' <span class="tag">yours</span>' : ""}</td><td colspan="4">${bad ? "Stopped with an error" + (bad.error.line ? " at line " + bad.error.line : "") : "Waiting for its first run"}</td></tr>`).join("")}
     </tbody></table></div>
-    <div class="flegend"><span><i class="sw-dot"></i>mean share of the possible couples found</span><span><i class="sw-range"></i>worst seed to best seed</span><span><i class="sw-tick"></i>a perfect reader of profiles, a reference and not a strategy</span><span><i class="sw-tick dotted"></i>random introductions, the floor</span><span><i class="sw-dot hot"></i>the strategy shown now</span></div>
+    <div class="flegend"><span><i class="sw-dot"></i>mean share of the possible couples found, over the seeds</span><span><i class="sw-range"></i>worst seed to best seed</span><span><i class="sw-tick"></i>a perfect reader of profiles, a reference and not a strategy</span><span><i class="sw-tick dotted"></i>random introductions, the floor</span><span><i class="sw-dot hot"></i>the strategy shown now</span></div>
     <p class="note">The axis runs from no couples to every couple the answer key allows, so a strategy a quarter of the way along found a quarter of them. When two lines overlap, this world cannot tell those strategies apart. ${big ? "Worlds of more than " + SEEDS_MAX_PEOPLE + " people are played with one seed only, to keep the page quick. " : ""}Press a name to see that strategy's run.</p>`;
   if (keep) { const b = $("p-all").querySelector(`[data-show="${CSS.escape(keep)}"]`); if (b) b.focus(); }
 }

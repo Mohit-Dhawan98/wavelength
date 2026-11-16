@@ -114,6 +114,8 @@ def scorecard(
                 "introductions": len(this_week),
                 "answered": sum(i.a_answered and i.b_answered for i in this_week),
                 "both_said_yes": sum(i.stage >= 1 for i in this_week),
+                "kept_talking": sum(i.stage >= 2 for i in this_week),
+                "met": sum(i.stage >= 3 for i in this_week),
                 "hit_it_off": sum(i.stage >= LAST_STAGE for i in this_week),
                 "gave_up": sum(r == week for r in play.gave_up_in.values()),
             }
@@ -145,6 +147,15 @@ def scorecard(
             "wasted": sum(i.stage == 0 for i in made),
             "one_sided": sum(i.a_yes != i.b_yes for i in made),
             "known_dealbreaker_violations": sum(not i.known_ok for i in made),
+            # One unit, introductions, from made down to the last stage: the funnel.
+            "funnel": [
+                {"step": "introductions made", "count": len(made)},
+                {"step": "answered by both", "count": len(both_answered)},
+                *(
+                    {"step": STAGES[k], "count": sum(i.stage >= k for i in made)}
+                    for k in stages
+                ),
+            ],
         },
         "people_outcomes": {
             "hit_it_off": 2 * couples[LAST_STAGE],
