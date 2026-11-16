@@ -9,6 +9,9 @@ license-files = ["LICENSE"]
 authors = [{ name = "Mohit Dhawan", email = "mohit.dhawan2510@gmail.com" }]
 dependencies = ["numpy>=2.0"]
 
+[project.scripts]
+wavelength = "wavelength.cli:main"
+
 [dependency-groups]
 dev = ["pytest>=8.0"]
 

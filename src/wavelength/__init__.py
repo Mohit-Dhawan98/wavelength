@@ -13,6 +13,19 @@ Module map, in the order the pipeline runs:
 - ``scoring``    tri-signal, per-viewer (asymmetric) scores
 - ``matching``   mutual top-N, success probability, greedy assignment
 - ``baselines``  similarity-only and one-directional strategies
+
+The simulation, which runs those strategies in a made-up world whose
+assumptions are stated as named parameters:
+
+- ``scenario``     the assumptions about a world, as documented fields
+- ``presets``      named worlds: today, casual, serious, dystopia
+- ``scenario_io``  scenarios as plain data: files and ``--set`` overrides
+- ``population``   hidden truth: who the simulated people are
+- ``decisions``    hidden truth: who would say yes to whom
+- ``observation``  what the app has learned; all a matcher sees
+- ``simulate``     the three strategies on the same people, and the score
+- ``report``       plain-text rendering
+- ``cli``          the ``wavelength`` command
 """
 
 __version__ = "0.1.0"

@@ -1,6 +1,6 @@
 # How matching should work
 
-Eight principles behind this implementation. The substance comes from
+Nine principles behind this implementation. The substance comes from
 [the article](https://themlnerd.substack.com/p/why-the-girl-you-want-doesnt-want);
 each principle points at the function that embodies it.
 
@@ -101,3 +101,23 @@ new users are stated limits, not footnotes.
 
 Code: `matching.acceptance_probability` and `matching.mutual_probability`,
 whose docstrings state the assumption.
+
+## 9. State a world's assumptions as named, arguable parameters
+
+A simulation cannot tell you how real people behave. It can tell you what
+follows from what you assumed, and that is only useful if the assumptions
+are the easiest part to read and to change. So every assumption about the
+simulated world is a named field with a real-world meaning: what share of
+the pool wants something casual, how many people a typical person says yes
+to, how often what people say matches what they do. A number someone can
+disagree with is worth more than a constant buried in a generator, and a
+uniform random draw is an assumption too, only an unexamined one. Worlds
+that differ (a casual app, a matrimony service, a broken market) are small
+sets of overrides with a reason beside each. The people's real preferences
+and answers are kept hidden from the matcher, their answers are never
+computed from the matcher's own score, and the output is read as a property
+of the stated world, not as evidence about the real one.
+
+Code: `scenario.Scenario`, whose fields carry their meaning, sensible range
+and basis; `presets.PRESETS`; and `decisions.decide`, the hidden rule for
+who says yes.
