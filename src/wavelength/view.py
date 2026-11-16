@@ -129,6 +129,7 @@ class View:
         "_board",
         "_weights",
         "_order",
+        "_seed",
     )
 
     def __init__(
@@ -141,6 +142,7 @@ class View:
         weights: np.ndarray,
         history: History,
         order: np.ndarray,
+        seed: int = 0,
     ) -> None:
         self.round = round
         self.rounds = rounds
@@ -162,6 +164,7 @@ class View:
         self._board = board
         self._weights = _frozen(weights)
         self._order = _frozen(order)
+        self._seed = seed
 
     # --- signals ---------------------------------------------------------
 
@@ -183,6 +186,14 @@ class View:
             raise ValueError(f"unknown feature(s) {unknown}; features are {list(FEATURE_NAMES)}")
         row = [float(weights.get(name, 0.0)) for name in FEATURE_NAMES]
         return self._board.feature_similarity(np.tile(row, (self.n, 1)))
+
+    def random(self) -> np.ndarray:
+        """An ``n x n`` matrix of random numbers between 0 and 1.
+
+        Seeded by the world and the round, so it is the same for every rule
+        and every rerun: use it for a random baseline or to break ties.
+        """
+        return np.random.default_rng([self._seed, self.round]).random((self.n, self.n))
 
     # --- turning a score into pairs --------------------------------------
 

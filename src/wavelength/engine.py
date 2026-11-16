@@ -241,6 +241,7 @@ class Arena:
                 weights=weights,
                 history=history,
                 order=order_rng.permutation(n),
+                seed=self.seed,
             )
             pairs = checked_pairs(rule(view), view)
 

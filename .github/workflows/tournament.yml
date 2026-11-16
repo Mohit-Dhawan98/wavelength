@@ -1,0 +1,40 @@
+# Runs when a pull request adds or changes a rule. It checks that the test
+# suite still passes, plays every rule in rules/ against the preset worlds,
+# and keeps the leaderboard as a downloadable artifact. It publishes nothing.
+name: tournament
+
+on:
+  pull_request:
+    paths:
+      - "rules/**"
+
+permissions:
+  contents: read
+
+jobs:
+  tournament:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Install
+        run: uv sync
+
+      - name: Tests
+        run: uv run pytest
+
+      - name: Tournament
+        run: >
+          uv run wavelength tournament rules/
+          --worlds today,casual,serious,swipe,dystopia
+          --seeds 5
+          --out leaderboard.json
+
+      - name: Keep the leaderboard
+        uses: actions/upload-artifact@v4
+        with:
+          name: leaderboard
+          path: leaderboard.json
