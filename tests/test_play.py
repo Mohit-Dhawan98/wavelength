@@ -30,7 +30,7 @@ ROOT = Path(__file__).resolve().parent.parent
 RULES = ROOT / "rules"
 SMALL = dataclasses.replace(Scenario(), pool_size=200)
 DEMO = {r.name: r for file in sorted(RULES.glob("*.py")) for r in load_rules(file)}
-ARTICLE = DEMO["the article's rule"]
+ARTICLE = DEMO["the article's rule, approximated"]
 
 
 @pytest.fixture(scope="module")
@@ -447,7 +447,7 @@ def test_the_seven_demo_rules_exist_and_run():
         "most similar",
         "best for me",
         "dealbreakers then greedy",
-        "the article's rule",
+        "the article's rule, approximated",
         "stable matching",
         "spread attention",
     }
@@ -469,7 +469,7 @@ def test_rules_that_check_dealbreakers_never_break_a_known_one():
     arena = Arena(SMALL, seed=0)
     for name in (
         "dealbreakers then greedy",
-        "the article's rule",
+        "the article's rule, approximated",
         "stable matching",
         "spread attention",
     ):
@@ -497,7 +497,7 @@ def test_scorecard_is_plain_json_with_the_promised_parts():
         "cast",
         "events",
     } <= set(card)
-    assert card["rule"] == "the article's rule" and card["people"] == 200 and card["rounds"] == 5
+    assert card["rule"] == "the article's rule, approximated" and card["people"] == 200 and card["rounds"] == 5
     assert [s["stage"] for s in card["stages"]] == [1, 2, 3, 4]
     for s in card["stages"]:
         assert 0 <= s["couples"] <= s["best_possible"]
@@ -527,6 +527,13 @@ def test_scorecard_is_plain_json_with_the_promised_parts():
     assert set(card["fates"]) == {"gave_up", "left_as_couple"}
     assert card["events"] and all(e["a"] in followed or e["b"] in followed for e in card["events"])
     assert all(0 <= e["stage"] <= 4 and 1 <= e["round"] <= 5 for e in card["events"])
+    assert all(isinstance(e["known_ok"], bool) for e in card["events"])
+    assert sum(not e["known_ok"] for e in card["events"]) == made["known_dealbreaker_violations"]
+    # nobody is introduced after the week they left, and couples leave together
+    left = {int(p): week for p, week in card["fates"]["left_as_couple"].items()}
+    for e in card["events"]:
+        for person in (e["a"], e["b"]):
+            assert person not in left or e["round"] <= left[person]
 
 
 def test_run_accepts_a_preset_a_scenario_or_a_plain_function():
@@ -587,7 +594,7 @@ def test_a_broken_rule_is_recorded_and_does_not_stop_the_tournament():
         "same side" in rows["broken"]["worlds"]["today"]["error"]
         and rows["broken"]["overall"] == 0.0
     )
-    assert "score" in rows["the article's rule"]["worlds"]["today"]
+    assert "score" in rows["the article's rule, approximated"]["worlds"]["today"]
     assert "broken failed in today" in format_leaderboard(result)
 
 
@@ -685,13 +692,14 @@ def test_presets_and_rules_are_listed_as_data():
     assert json.loads(json.dumps(presets)) == presets
     listed = web.list_rules()
     assert {r["name"] for r in listed} == set(DEMO) and all("@rule" in r["source"] for r in listed)
+    assert "article" in {r["id"] for r in listed} and len({r["id"] for r in listed}) == len(listed)
 
 
 def test_web_run_returns_a_scorecard_for_source_or_a_name():
     card = web.run({"preset": "casual", "yes_rate": 0.5}, GOOD, seed=2, people=150, rounds=3)
     assert card["rule"] == "mine" and card["world"] == "casual (modified)" and card["people"] == 150
     assert json.loads(json.dumps(card)) == card
-    named = web.run({"preset": "today"}, "the article's rule", people=150, rounds=3)
+    named = web.run({"preset": "today"}, "the article's rule, approximated", people=150, rounds=3)
     assert named == {**run(ARTICLE, "today", people=150, rounds=3), "world": "today"}
     with_import = "from wavelength.play import rule\nimport numpy\n" + GOOD
     assert web.run({}, with_import, people=120, rounds=1)["rule"] == "mine"

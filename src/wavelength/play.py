@@ -168,6 +168,7 @@ def scorecard(
                 "a_yes": i.a_yes,
                 "b_yes": i.b_yes,
                 "stage": i.stage,
+                "known_ok": i.known_ok,
             }
             for i in made
             if i.a in followed or i.b in followed

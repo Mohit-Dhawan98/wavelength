@@ -150,13 +150,20 @@ def _rules_directory() -> Path | None:
 
 
 def list_rules() -> list[dict[str, str]]:
-    """The demo rules shipped with the package: name, description and source text."""
+    """The demo rules shipped with the package: id (the file's name), name, description, source."""
     directory = _rules_directory()
     listed = []
     for path in sorted(directory.glob("*.py")) if directory else []:
         source = path.read_text(encoding="utf-8")
         for found in _compile(source):
-            listed.append({"name": found.name, "description": found.description, "source": source})
+            listed.append(
+                {
+                    "id": path.stem,
+                    "name": found.name,
+                    "description": found.description,
+                    "source": source,
+                }
+            )
     return listed
 
 
@@ -231,7 +238,7 @@ def _play(arena: Arena, chosen: Rule, rounds: int, world_name: str) -> dict[str,
 
 def run(
     settings: Mapping[str, Any] | None = None,
-    rule_source_or_name: str = "the article's rule",
+    rule_source_or_name: str = "the article's rule, approximated",
     seed: int = 0,
     people: int | None = DEFAULT_PEOPLE,
     rounds: int = DEFAULT_ROUNDS,
