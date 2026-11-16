@@ -154,6 +154,10 @@ def scorecard(
         },
         "per_round": per_round,
         "cast": [arena.describe_person(person) for person in cast],
+        "fates": {
+            "gave_up": {str(p): week + 1 for p, week in sorted(play.gave_up_in.items())},
+            "left_as_couple": {str(p): week + 1 for p, week in sorted(play.left_in.items())},
+        },
         "events": [
             {
                 "round": i.round + 1,

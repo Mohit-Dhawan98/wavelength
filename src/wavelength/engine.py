@@ -43,7 +43,7 @@ from wavelength.world import generate_world
 DEFAULT_ROUNDS = 8
 
 #: How many people from each side are followed in the event log.
-CAST_PER_SIDE = 12
+CAST_PER_SIDE = 400
 
 #: Rounds that count as "recent" in ``History.recent_declines``.
 RECENT = 2
@@ -129,6 +129,7 @@ class Arena:
         self._observations = self._world.observations.copy()
         self._board = Board(self._observations.copy())
         self._best: dict[int, int] = {}
+        self._possible: np.ndarray | None = None
         self._informed: dict[int, Play] = {}
 
     @property
@@ -172,10 +173,20 @@ class Arena:
         return self._informed[rounds]
 
     def cast(self) -> list[int]:
-        """The small group of people whose story the event log follows."""
+        """The people whose story the event log follows: everyone, up to a cap per side."""
         larger = np.flatnonzero(self._board.larger_side)[:CAST_PER_SIDE]
         scarce = np.flatnonzero(~self._board.larger_side)[:CAST_PER_SIDE]
         return sorted(int(p) for p in (*larger, *scarce))
+
+    def possible_partners(self) -> np.ndarray:
+        """For each person, how many people the answer key says they would hit it off with.
+
+        This is hidden truth. It is for the scorecard after a run, never for a rule.
+        """
+        if self._possible is None:
+            reaches = self._world.key.reaches(LAST_STAGE)
+            self._possible = (reaches | reaches.T).sum(axis=1).astype(int)
+        return self._possible
 
     def describe_person(self, person: int) -> dict[str, object]:
         """What the app shows about one person: nothing hidden."""
@@ -188,6 +199,7 @@ class Arena:
             "community": communities[int(obs.community[person])],
             "x": round(float(obs.location[person, 0]), 3),
             "y": round(float(obs.location[person, 1]), 3),
+            "possible": int(self.possible_partners()[person]),
         }
 
     def play(self, rule: RuleFunction, rounds: int = DEFAULT_ROUNDS) -> Play:

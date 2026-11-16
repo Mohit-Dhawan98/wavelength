@@ -115,7 +115,7 @@ async function run(animate) {
     err.textContent = (data.error.where === "rule" ? "Your rule" : "The world") + (data.error.line ? ", line " + data.error.line : "") + ": " + data.error.message;
     return;
   }
-  err.hidden = true; state.result = data; $("took").textContent = "ran in " + m.ms + " ms"; saveHash();
+  err.hidden = true; state.result = data; $("took").textContent = "ran in " + m.ms + " ms";
   $("stage-rule").textContent = data.rule; $("run").textContent = "Run the " + data.rounds + " weeks";
   drawScore(data); drawStage(data);
   if (animate && !reduced) playFrom(0); else showWeek(data.rounds - 1, false);
@@ -227,13 +227,14 @@ async function compare() {
 /* ---------- sharing ---------- */
 const enc = o => btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(o)))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 const dec = s => JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0))));
-function saveHash() { history.replaceState(null, "", "#" + enc({ p: state.preset, o: state.overrides, r: $("code").value, ...sizeArgs() })); }
+// The address bar is left alone. A share link is only built when someone asks for one.
+const shareLink = () => location.origin + location.pathname + "#" + enc({ p: state.preset, o: state.overrides, r: $("code").value, ...sizeArgs() });
 function loadHash() {
   try {
     const o = dec(location.hash.slice(1)); if (!presetOf(o.p)) return false;
     state.preset = o.p; state.overrides = o.o || {}; $("code").value = o.r || "";
     $("seed").value = o.seed ?? 0; $("people").value = o.people ?? 400; $("rounds").value = o.rounds ?? 8; return true;
-  } catch (e) { return false; }
+  } catch (e) { return false; } finally { history.replaceState(null, "", location.pathname + location.search); }
 }
 
 /* ---------- start ---------- */
@@ -248,6 +249,6 @@ function start(meta) {
   $("run").addEventListener("click", () => run(true)); $("compare").addEventListener("click", compare);
   $("prev").addEventListener("click", () => stepTo(state.week - 1)); $("next").addEventListener("click", () => stepTo(state.week + 1));
   $("pause").addEventListener("click", () => { if (state.playing) { clearTimeout(state.timer); setPlaying(false); } else playFrom(state.week + 1 < state.result.rounds ? state.week : 0); });
-  $("share").addEventListener("click", async () => { saveHash(); try { await navigator.clipboard.writeText(location.href); $("share").textContent = "Link copied"; setTimeout(() => $("share").textContent = "Copy a link to this world and rule", 1600); } catch (e) {} });
+  $("share").addEventListener("click", async () => { try { await navigator.clipboard.writeText(shareLink()); $("share").textContent = "Link copied"; setTimeout(() => $("share").textContent = "Copy a link to this world and rule", 1600); } catch (e) {} });
   setPlaying(false); run(true);
 }

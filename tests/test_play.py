@@ -522,8 +522,9 @@ def test_scorecard_is_plain_json_with_the_promised_parts():
     ]
     assert card["people_outcomes"]["hit_it_off"] == 2 * card["stages"][-1]["couples"]
     followed = {p["id"] for p in card["cast"]}
-    assert len(followed) == 24 and {p["side"] for p in card["cast"]} == {"larger", "scarce"}
-    assert set(card["cast"][0]) == {"id", "side", "age", "community", "x", "y"}
+    assert len(followed) == card["people"] and {p["side"] for p in card["cast"]} == {"larger", "scarce"}
+    assert set(card["cast"][0]) == {"id", "side", "age", "community", "x", "y", "possible"}
+    assert set(card["fates"]) == {"gave_up", "left_as_couple"}
     assert card["events"] and all(e["a"] in followed or e["b"] in followed for e in card["events"])
     assert all(0 <= e["stage"] <= 4 and 1 <= e["round"] <= 5 for e in card["events"])
 
