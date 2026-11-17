@@ -84,6 +84,8 @@ def visit(browser, name, width, height):
     page.wait_for_function("document.querySelector('#force svg')", timeout=20000)
     finished()
     shot("first_view")
+    switches = page.evaluate("[...document.querySelectorAll('.snd, .thm')].map(b => { const r = b.getBoundingClientRect(); return r.width > 0 && r.left >= 0 && r.right <= innerWidth; })")
+    check("the sound and theme switches are both on screen", switches == [True, True], str(switches))
     check("the title and the headline carry the name", page.title() == "Dating Environment" and "Design a matching rule" in page.inner_text("h1"))
     check("a result is shown without asking", "couples who could have hit it off" in page.inner_text("#result-h"), page.inner_text("#result-h"))
     if not phone:
@@ -195,6 +197,8 @@ def visit(browser, name, width, height):
     shot("person_story")
     story = page.inner_text("#card")
     check("clicking a person tells their story week by week", "Week" in story and "Introduced to #" in story and "How it turned out" in story and "What was possible" in story, story[:120].replace("\n", " "))
+    if phone:
+        check("on a phone the story comes into view after the tap", page.evaluate("document.getElementById('card').getBoundingClientRect().top < innerHeight * 0.6"))
     check("everything else fades", page.evaluate("document.querySelector('#force svg').classList.contains('focus')") and page.locator(".gn.on").count() < 30)
     page.fill("#g-find", "41")
     page.press("#g-find", "Enter")
