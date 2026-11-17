@@ -36,17 +36,17 @@ export function mountGraph(host, data, { onFocus }) {
   const nodes = data.cast.map(p => ({ id: p.id, side: p.side, possible: p.possible, r: radius(p.possible), first: Infinity, left: left[p.id] ?? Infinity, gave: gave[p.id] ?? Infinity }));
   const byId = new Map(nodes.map(n => [n.id, n]));
   const links = [];
-  data.events.forEach((ev, i) => {
-    const a = byId.get(ev.a), b = byId.get(ev.b); if (!a || !b) return;
-    a.first = Math.min(a.first, ev.round); b.first = Math.min(b.first, ev.round);
-    links.push({ source: a, target: b, kind: linkKind(ev), round: ev.round, i });
-  });
-  const pulling = links.filter(l => l.kind !== "none");
   // How far each person got with anyone: 3 found a partner, 2 had a yes from both, 1 was answered, 0 nothing.
-  // The layout pulls people who got further towards the middle, so the picture changes with the rule.
   const rank = { hit: 3, yes: 2, no: 1, none: 0 };
   nodes.forEach(n => { n.depth = 0; });
-  links.forEach(l => { l.source.depth = Math.max(l.source.depth, rank[l.kind]); l.target.depth = Math.max(l.target.depth, rank[l.kind]); });
+  data.events.forEach((ev, i) => {
+    const a = byId.get(ev.a), b = byId.get(ev.b), kind = linkKind(ev);
+    // In a world too large to draw whole, one end of an introduction may be off the picture.
+    for (const n of [a, b]) if (n) { n.first = Math.min(n.first, ev.round); n.depth = Math.max(n.depth, rank[kind]); }
+    if (a && b) links.push({ source: a, target: b, kind, round: ev.round, i });
+  });
+  const pulling = links.filter(l => l.kind !== "none");
+  // The layout pulls people who got further towards the middle, so the picture changes with the rule.
 
   let W = Math.max(320, host.clientWidth), H = Math.max(280, host.clientHeight);
   // Lay out in a box with the panel's proportions so the picture fills it.

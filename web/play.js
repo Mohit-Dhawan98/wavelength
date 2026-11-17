@@ -291,7 +291,7 @@ $("run-all").addEventListener("click", async () => {
   if (!state.shown) await runStrategy(activeStrategy());
   if (!state.shown) return;
   selectTab("all"); sound.play("tick");
-  if (matchMedia("(max-width: 1099px)").matches) $("result").scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
+  if (matchMedia("(max-width: 899px)").matches) $("result").scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
 });
 
 /* ---------- running ---------- */
@@ -394,7 +394,7 @@ function mount() {
   if (!state.shown) return;
   const { card } = state.shown; if (state.graphFor === card) return;
   if (state.graph) state.graph.destroy();
-  state.graph = mountGraph($("force"), card, { onFocus: id => { renderCard(id); if (id != null) sound.play("step"); } });
+  state.graph = mountGraph($("force"), card, { onFocus: id => { renderCard(id); if (id != null) { sound.play("step"); revealStory(); } } });
   state.graph.setUnanswered($("g-unanswered").getAttribute("aria-pressed") === "true");
   state.graph.setWeek(state.week, false); state.graphFor = card;
 }
@@ -458,20 +458,27 @@ function legendHTML(card) {
   const dot = (cls, shape = "c") => `<svg class="sw ${cls}" viewBox="0 0 14 14" aria-hidden="true">${shape === "c" ? '<circle cx="7" cy="7" r="5"/>' : '<rect x="2.5" y="2.5" width="9" height="9" rx="1"/>'}</svg>`;
   const line = k => `<svg class="sw-l" viewBox="0 0 26 8" aria-hidden="true"><line x1="1" y1="4" x2="25" y2="4" class="gl k-${k}"/></svg>`;
   const row = (mark, text) => `<li><span class="mk">${mark}</span><span>${text}</span></li>`;
-  return `<p class="how">Where people sit means something. The further a person got with anyone, the nearer the middle: couples in the centre, then people who got a yes from both, then people who were answered, and on the rim people nobody answered. So a rule that finds more couples draws a bigger orange centre. ${matchMedia("(pointer: coarse)").matches ? "Use two fingers to move or zoom the graph." : "Drag to move, scroll to zoom."} Numbers appear as you zoom in.${card.cast.length < card.people ? ` ${card.cast.length} of the ${card.people} people are drawn: the first 400 on each side.` : ""}</p>
+  return `<p class="how">Where people sit means something. The further a person got with anyone, the nearer the middle: couples in the centre, then people who got a yes from both, then people who were answered, and on the rim people nobody answered. So a rule that finds more couples draws a bigger orange centre. ${matchMedia("(pointer: coarse)").matches ? "Use two fingers to move or zoom the graph." : "Drag to move, scroll to zoom."} Numbers appear as you zoom in.${card.cast.length < card.people ? ` ${card.cast.length} of the ${card.people} people are drawn, the first 400 on each side, so a few partners are off the picture.` : ""}</p>
   <ul class="key">
     ${row(dot("s-looking"), `A circle is a person on the side with more people (${sides.larger}).`)}
     ${row(dot("s-looking", "r"), `A square is a person on the side with fewer (${sides.scarce}).`)}
     ${row('<svg class="sw-size" viewBox="0 0 30 14" aria-hidden="true"><circle cx="5" cy="7" r="3"/><circle cx="20" cy="7" r="6.5"/></svg>', "Bigger means the answer key has more people they could have hit it off with.")}
     ${row(dot("s-matched"), "Orange left as a couple.")}
     ${row(dot("s-looking"), "Grey is still looking.")}
-    ${row(dot("s-gaveup"), "Black gave up.")}
+    ${row(dot("s-gaveup"), `<span class="t-light">Black</span><span class="t-dark">White</span> gave up.`)}
     ${row(dot("s-unmet"), "Hollow has not been introduced to anyone yet.")}
     ${row(line("hit"), "An introduction where both want to meet again.")}
     ${row(line("yes"), "Both said yes, and it stopped later.")}
     ${row(line("no"), "Someone said no.")}
     ${row(line("none"), "One or both never answered. Hidden until you press Unanswered.")}
   </ul>`;
+}
+
+/* On a phone the story sits under the graph. Bring its start up into view, leaving the graph's foot visible. */
+function revealStory() {
+  if (!matchMedia("(max-width: 899px)").matches) return;
+  const top = $("card").getBoundingClientRect().top;
+  if (top > innerHeight * 0.55) scrollBy({ top: top - innerHeight * 0.35, behavior: reduced ? "auto" : "smooth" });
 }
 
 /* one person's story */
@@ -629,7 +636,7 @@ function openEditor(s) {
   $("pane-list").hidden = true; $("pane-edit").hidden = false; $("work").classList.add("editing");
   syncGutter(); sound.play("open"); $("strategies").scrollTop = 0;
   $("code").focus({ preventScroll: true }); $("code").setSelectionRange(0, 0); $("code").scrollTop = 0;
-  if (matchMedia("(max-width: 1099px)").matches) $("strategies").scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
+  if (matchMedia("(max-width: 899px)").matches) $("strategies").scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
 }
 function closeEditor() {
   state.editing = null; $("pane-edit").hidden = true; $("pane-list").hidden = false; $("work").classList.remove("editing");
@@ -637,7 +644,7 @@ function closeEditor() {
 }
 function syncGutter() {
   const n = $("code").value.split("\n").length, bad = state.editing && state.editing.errorLine;
-  $("gutter").innerHTML = Array.from({ length: n }, (_, i) => `<span${i + 1 === bad ? ' class="bad"' : ""}>${i + 1}</span>`).join("\n");
+  $("gutter").innerHTML = Array.from({ length: n }, (_, i) => `<span${i + 1 === bad ? ' class="bad"' : ""}>${i + 1}</span>`).join("");
   $("gutter").scrollTop = $("code").scrollTop;
 }
 function setEditorError(error) {
@@ -740,6 +747,7 @@ async function readHash() {
     }
     const q = new URLSearchParams(raw);
     if (presetOf(q.get("w"))) state.preset = q.get("w");
+    state.overrides = {};
     const known = new Set(state.meta.settings.map(s => s.key));
     (q.get("o") || "").split(",").forEach(pair => { const [k, v] = pair.split(":"); if (known.has(k) && isFinite(+v)) state.overrides[k] = +v; });
     const num = (k, d, lo, hi) => { const v = parseInt(q.get(k), 10); return isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d; };
@@ -766,5 +774,11 @@ async function start(meta) {
   boot.stop(); $("boot").hidden = true; $("app").hidden = false; document.body.classList.remove("booting"); document.body.classList.add("ready");
   runStrategy(activeStrategy(), { quiet: true });
 }
+// A share link pasted into a tab that already has the page open.
+addEventListener("hashchange", async () => {
+  if (!state.meta || location.hash.length < 2) return;
+  await readHash(); if (state.editing) closeEditor();
+  renderWorlds(); renderStrategies(); runStrategy(activeStrategy());
+});
 // for the checks in dev_check.py
 window.__env = { state, shareLink, seedsLeft };
